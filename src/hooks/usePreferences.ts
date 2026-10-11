@@ -24,6 +24,8 @@ export function usePreferences() {
     const media = matchMedia('(prefers-reduced-motion: reduce)');
     const update = () => setReduced(media.matches);
     media.addEventListener('change', update);
+    // Catch a preference change between the initial render and subscribing.
+    update();
     return () => media.removeEventListener('change', update);
   }, []);
   useEffect(() => {
