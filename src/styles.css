@@ -33,3 +33,12 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--glass-edge)
 .button-primary,.icon-button.selected{transition-property:transform,box-shadow}
 /* WebKit fallback retains the layered lens, rim and pointer reflection without SVG repaint stalls. */
 @supports (-webkit-backdrop-filter:blur(1px)){.glass-optics:before{filter:none}}
+
+/* Escalate gracefully when measured frame delivery is too slow, even on software renderers.
+   Keep warm translucent surfaces, highlight rims, reflections and button feedback. */
+:root[data-quality=minimal] .glass,:root[data-quality=minimal] .glass-button{-webkit-backdrop-filter:none;backdrop-filter:none}
+:root[data-quality=minimal] .glass-optics:before{filter:none;transform:none}
+:root[data-quality=minimal] .ambient-orb{filter:none;animation:none;opacity:.25}
+:root[data-quality=minimal] .ambient-grain{display:none}
+:root[data-quality=minimal] .art-float,:root[data-quality=minimal] .floating-social,:root[data-quality=minimal] .heading-star{animation:none}
+:root[data-quality=minimal] .art-parallax{transform:none;transition:none}
