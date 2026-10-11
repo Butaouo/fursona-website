@@ -1,0 +1,78 @@
+name: Test and deploy LongDay to GitHub Pages
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: longday-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Install browser test engines
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Test desktop, mobile, preferences, music, links and accessibility
+        run: npm run test:e2e
+      - name: Audit mobile and desktop performance
+        run: npm run audit
+      - name: Upload verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-${{ github.sha }}
+          path: |
+            reports/
+            playwright-report/
+            test-results/
+          retention-days: 30
+      - name: Upload production site
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Deploy production artifact
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Verify published HTML
+        env:
+          PAGES_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if curl --fail --silent --show-error --location "$PAGES_URL" --output /tmp/longday-page.html && grep -q 'LongDay' /tmp/longday-page.html; then
+              echo "Verified $PAGES_URL" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1

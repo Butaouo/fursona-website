@@ -1,0 +1,85 @@
+{
+  "checkedAt": "2026-10-10T20:25:41.728Z",
+  "results": [
+    {
+      "name": "X",
+      "requested": "https://x.com/minigrapesJTHG",
+      "final": "https://x.com/minigrapesJTHG",
+      "status": 200,
+      "reachable": true,
+      "verification": "HTTP reachable; login may be required"
+    },
+    {
+      "name": "Instagram",
+      "requested": "https://www.instagram.com/hg_long_day",
+      "final": "https://www.instagram.com/hg_long_day",
+      "status": 200,
+      "reachable": true,
+      "verification": "HTTP reachable; profile content still needs visual verification"
+    },
+    {
+      "name": "Bluesky",
+      "requested": "https://bsky.app/profile/jthg.bsky.social",
+      "final": "https://bsky.app/profile/jthg.bsky.social",
+      "status": 200,
+      "reachable": true,
+      "verification": "HTTP reachable; profile content still needs visual verification"
+    },
+    {
+      "name": "Threads",
+      "requested": "https://www.threads.com/@hg_long_day",
+      "final": "https://www.threads.com/@hg_long_day",
+      "status": 200,
+      "reachable": true,
+      "verification": "HTTP reachable; profile content still needs visual verification"
+    },
+    {
+      "name": "Bilibili",
+      "requested": "https://b23.tv/i2oyJC2",
+      "final": "https://space.bilibili.com/473910784",
+      "status": 200,
+      "reachable": true,
+      "verification": "HTTP reachable; profile content still needs visual verification"
+    },
+    {
+      "name": "Steam",
+      "requested": "https://steamcommunity.com/profiles/76561199012366040",
+      "final": "https://steamcommunity.com/profiles/76561199012366040",
+      "status": 200,
+      "reachable": true,
+      "verification": "HTTP reachable; login may be required"
+    },
+    {
+      "name": "bump",
+      "requested": "https://bump.app/p/pDMCRg7QgkQSZ",
+      "final": "https://bump.app/p/pDMCRg7QgkQSZ",
+      "status": 200,
+      "reachable": true,
+      "verification": "HTTP reachable; profile content still needs visual verification"
+    },
+    {
+      "name": "Facebook",
+      "requested": "https://www.facebook.com/share/17jzGmXyGU/?mibextid=wwXIfr",
+      "final": "https://www.facebook.com/people/HaGoo-LongDay/pfbid0gSiBf22RjeKrrgb8RTY2ExMZA2A4TSqsm9PfS9ttFqJy5n8uP9baN6PvgnAQeYhYl/?mibextid=wwXIfr&rdid=TFEZlC2gdzVfPlhg&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F17jzGmXyGU%2F%3Fmibextid%3DwwXIfr",
+      "status": 200,
+      "reachable": true,
+      "verification": "HTTP reachable; profile content still needs visual verification"
+    },
+    {
+      "name": "Apple Music",
+      "requested": "https://music.apple.com/tw/album/younger/1814208594?i=1814208601",
+      "final": "https://music.apple.com/tw/album/younger/1814208594?i=1814208601",
+      "status": 200,
+      "reachable": true,
+      "verification": "HTTP reachable; profile content still needs visual verification"
+    },
+    {
+      "name": "Apple Music embed",
+      "requested": "https://embed.music.apple.com/tw/album/younger/1814208594?i=1814208601",
+      "final": "https://embed.music.apple.com/tw/album/younger/1814208594?i=1814208601",
+      "status": 200,
+      "reachable": true,
+      "verification": "HTTP reachable; profile content still needs visual verification"
+    }
+  ]
+}
