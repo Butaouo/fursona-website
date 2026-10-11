@@ -15,26 +15,29 @@ concurrency:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npm run build
+      - name: TypeScript and production build
+        id: build
+        run: npm run build
       - name: Install browser test engines
         run: npx playwright install --with-deps chromium firefox webkit
       - name: Test desktop, mobile, preferences, music, links and accessibility
         run: npm run test:e2e
       - name: Audit mobile and desktop performance
+        if: success() || (failure() && steps.build.outcome == 'success')
         run: npm run audit
       - name: Upload verification evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: verification-${{ github.sha }}
           path: |
@@ -50,7 +53,7 @@ jobs:
   deploy:
     if: github.event_name != 'pull_request'
     needs: verify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       pages: write
