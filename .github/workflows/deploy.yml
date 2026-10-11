@@ -49,14 +49,26 @@ jobs:
                 for (const content of ['blank', 'website']) {
                   if (content === 'blank') await page.setContent('<button>Display clock probe</button>');
                   else await page.goto(url);
-                  const sample = await page.evaluate(() => new Promise(resolve => {
-                    let frames = 0, id = 0;
-                    const start = performance.now();
-                    const tick = () => { frames++; id = requestAnimationFrame(tick); };
-                    id = requestAnimationFrame(tick);
-                    setTimeout(() => { cancelAnimationFrame(id); resolve({ frames, durationMs: performance.now() - start, visibility: document.visibilityState }); }, 2000);
-                  }));
-                  console.log(JSON.stringify({ engine: 'webkit', headless, content, ...sample }));
+                  const variants = content === 'blank' ? [['baseline', '']] : [
+                    ['baseline', ''],
+                    ['no-noise', '.ambient-grain{display:none!important}'],
+                    ['no-backdrop', '.glass,.glass-button{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}'],
+                    ['no-orb-blur', '.ambient-orb{filter:none!important}'],
+                    ['no-refraction', '.glass-optics:before{filter:none!important}'],
+                    ['no-canvas', '.ambient canvas{display:none!important}'],
+                  ];
+                  for (const [effect, css] of variants) {
+                    const style = css ? await page.addStyleTag({ content: css }) : null;
+                    const sample = await page.evaluate(() => new Promise(resolve => {
+                      let frames = 0, id = 0;
+                      const start = performance.now();
+                      const tick = () => { frames++; id = requestAnimationFrame(tick); };
+                      id = requestAnimationFrame(tick);
+                      setTimeout(() => { cancelAnimationFrame(id); resolve({ frames, durationMs: performance.now() - start, visibility: document.visibilityState, quality: document.documentElement.dataset.quality }); }, 2000);
+                    }));
+                    console.log(JSON.stringify({ engine: 'webkit', headless, content, effect, ...sample }));
+                    if (style) await style.evaluate(node => node.remove());
+                  }
                 }
               } finally { await browser.close(); }
             }
