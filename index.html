@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-TW" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f7f2e8" />
+    <meta name="description" content="我是哈古久天、叫我久天就行！Meet LongDay, a cream-white cat-fox with a little sunshine and a little attitude." />
+    <meta property="og:title" content="LongDay · 哈古久天" />
+    <meta property="og:description" content="留一點暖光，給相遇的你。A little warmth for everyone I meet." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://Butaouo.github.io/fursona-website/" />
+    <meta property="og:image" content="https://Butaouo.github.io/fursona-website/images/lyont-avatar.webp" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" type="image/webp" href="%BASE_URL%images/lyont-avatar.webp" />
+    <link rel="apple-touch-icon" href="%BASE_URL%images/lyont-avatar.webp" />
+    <link rel="canonical" href="https://Butaouo.github.io/fursona-website/" />
+    <link rel="preload" as="image" href="%BASE_URL%images/lyont-hero.webp" imagesrcset="%BASE_URL%images/lyont-hero-640.webp 640w, %BASE_URL%images/lyont-hero.webp 1120w" imagesizes="(max-width: 760px) 90vw, 46vw" fetchpriority="high" />
+    <script>
+      try {
+        var choice = localStorage.getItem('longday:theme');
+        document.documentElement.dataset.theme = choice === 'light' || choice === 'dark' ? choice : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.dataset.motion = localStorage.getItem('longday:motion') === 'paused' || matchMedia('(prefers-reduced-motion: reduce)').matches ? 'still' : 'full';
+      } catch (_) {}
+    </script>
+    <title>LongDay · 哈古久天</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript><main style="padding:2rem;font-family:system-ui"><h1>LongDay · 哈古久天</h1><p>我是哈古久天、叫我久天就行！</p><p>請開啟 JavaScript 使用互動功能。Please enable JavaScript for the interactive site.</p><a href="https://x.com/minigrapesJTHG">X</a> · <a href="https://www.instagram.com/hg_long_day">Instagram</a> · <a href="https://music.apple.com/tw/album/younger/1814208594?i=1814208601">Younger · Apple Music</a></main></noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
