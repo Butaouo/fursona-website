@@ -23,8 +23,10 @@ test('homepage and optimized assets load without clipping or JavaScript errors',
   expect(fullImage!.x).toBeGreaterThanOrEqual(0);
   expect(fullImage!.x + fullImage!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   await page.getByRole('tab', { name: '角色插畫', exact: true }).click();
-  await page.locator('.gallery-stage img').evaluate((img: HTMLImageElement) => img.decode());
-  expect(await page.locator('.gallery-stage img').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  const illustration = page.locator('#panel-artwork img');
+  await expect(illustration).toHaveAttribute('src', /lyont-illustration\.webp$/);
+  await expect(illustration).toHaveJSProperty('complete', true);
+  await expect.poll(() => illustration.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
   await page.screenshot({ path: `reports/${info.project.name}-light.png`, fullPage: true });
 });
 test('theme and language choices persist; system changes are observed', async ({ page }, info) => {
@@ -45,8 +47,18 @@ test('theme and language choices persist; system changes are observed', async ({
 });
 test('all configured social destinations are exact and external links are safe', async ({ page }) => {
   const links = page.locator('.social-link'); await expect(links).toHaveCount(11);
-  await expect(page.getByRole('link', { name: /^Instagram @hg_long_day/ })).toHaveAttribute('href', 'https://www.instagram.com/hg_long_day');
-  await expect(page.getByRole('link', { name: /^Email Buta0318/ })).toHaveAttribute('href', 'mailto:Buta0318@outlook.com');
+  const destinations = await page.locator('a.social-link').evaluateAll(nodes => nodes.map(n => n.getAttribute('href')).sort());
+  expect(destinations).toEqual([
+    'https://x.com/minigrapesJTHG',
+    'https://www.instagram.com/hg_long_day',
+    'https://bsky.app/profile/jthg.bsky.social',
+    'https://www.threads.com/@hg_long_day',
+    'https://b23.tv/i2oyJC2',
+    'https://steamcommunity.com/profiles/76561199012366040',
+    'https://bump.app/p/pDMCRg7QgkQSZ',
+    'https://www.facebook.com/share/17jzGmXyGU/?mibextid=wwXIfr',
+    'mailto:Buta0318@outlook.com',
+  ].sort());
   const externals = await page.locator('a[target="_blank"]').evaluateAll(nodes => nodes.every(n => n.getAttribute('rel')?.includes('noopener')));
   expect(externals).toBe(true);
   await expect(page.getByRole('button', { name: '複製 Discord Butaouo', exact: true })).toBeVisible();
@@ -93,6 +105,8 @@ test('gallery tabs, enlarged artwork and Escape work', async ({ page }) => {
 test('reduced motion and visitor animation control are respected', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect(page.locator('html')).toHaveAttribute('data-motion', 'still');
+  await expect(page.locator('.art-float')).toHaveCSS('animation-name', 'none');
+  await expect(page.locator('.orb-one')).toHaveCSS('animation-name', 'none');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.getByRole('button', { name: '暫停動態效果', exact: true }).click();
   await page.reload();
@@ -112,6 +126,8 @@ test('compact phone and tablet layouts retain full artwork and reachable control
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const width of [320, 768]) {
     await page.setViewportSize({ width, height: 960 });
+    // Mobile WebKit commits the layout viewport on the next rendering update.
+    await expect.poll(() => page.evaluate(() => innerWidth)).toBe(width);
     for (const language of ['zh-TW', 'en']) {
       if (await page.locator('html').getAttribute('lang') !== language)
         await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
