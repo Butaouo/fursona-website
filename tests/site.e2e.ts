@@ -1,8 +1,20 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-test.beforeEach(async ({ page }) => { await page.goto('./'); });
+const pageFailures = new WeakMap<Page, string[]>();
+test.beforeEach(async ({ page, baseURL }) => {
+  const failures: string[] = [];
+  pageFailures.set(page, failures);
+  // Subscribe before navigation so startup errors and missing bundles are not missed.
+  page.on('pageerror', error => failures.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') failures.push(message.text()); });
+  page.on('response', response => {
+    if (response.url().startsWith(baseURL!) && response.status() >= 400)
+      failures.push(`${response.status()} ${response.url()}`);
+  });
+  await page.goto('./');
+});
+test.afterEach(async ({ page }) => { expect(pageFailures.get(page), 'runtime, console and local resource errors').toEqual([]); });
 test('homepage and optimized assets load without clipping or JavaScript errors', async ({ page }, info) => {
-  const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(/久天/);
   await page.locator('.hero-image').evaluate((img: HTMLImageElement) => img.decode());
   expect(await page.locator('.hero-image').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
@@ -13,7 +25,6 @@ test('homepage and optimized assets load without clipping or JavaScript errors',
   await page.getByRole('tab', { name: '角色插畫', exact: true }).click();
   await page.locator('.gallery-stage img').evaluate((img: HTMLImageElement) => img.decode());
   expect(await page.locator('.gallery-stage img').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
-  expect(errors).toEqual([]);
   await page.screenshot({ path: `reports/${info.project.name}-light.png`, fullPage: true });
 });
 test('theme and language choices persist; system changes are observed', async ({ page }, info) => {
@@ -88,10 +99,30 @@ test('reduced motion and visitor animation control are respected', async ({ page
   await expect(page.locator('html')).toHaveAttribute('data-motion', 'still');
 });
 test('light and dark screens have no serious accessibility violations', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(page.locator('html')).toHaveAttribute('data-motion', 'still');
   for (const theme of ['light', 'dark']) {
     await page.getByTestId(`theme-${theme}`).click();
-    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     const result = await new AxeBuilder({ page }).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
     expect(result.violations).toEqual([]);
+  }
+});
+test('compact phone and tablet layouts retain full artwork and reachable controls in both languages', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  for (const width of [320, 768]) {
+    await page.setViewportSize({ width, height: 960 });
+    for (const language of ['zh-TW', 'en']) {
+      if (await page.locator('html').getAttribute('lang') !== language)
+        await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
+      await expect(page.locator('html')).toHaveAttribute('lang', language);
+      const layout = await page.evaluate(() => ({ viewport: innerWidth, scroll: document.documentElement.scrollWidth }));
+      expect(layout.scroll).toBeLessThanOrEqual(width);
+      expect(layout.viewport).toBe(width);
+      const artwork = await page.locator('.hero-image').boundingBox();
+      expect(artwork!.x).toBeGreaterThanOrEqual(0);
+      expect(artwork!.x + artwork!.width).toBeLessThanOrEqual(width);
+    }
+    await page.getByRole('button', { name: '切換為繁體中文', exact: true }).click();
   }
 });
