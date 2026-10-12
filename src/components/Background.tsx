@@ -10,7 +10,19 @@ export function Background({ enabled }: { enabled: boolean }) {
     const low = (nav.deviceMemory ?? 8) <= 4 || (nav.hardwareConcurrency ?? 8) <= 4 || nav.connection?.saveData;
     document.documentElement.dataset.quality = low ? 'low' : 'high';
     if (nav.connection?.saveData) return;
-    let width = 0, height = 0, raf = 0, last = 0, samples = 0, slow = 0, visible = !document.hidden;
+    let width = 0, height = 0, raf = 0, last = 0, samples = 0, slow = 0, frames = 0, visible = !document.hidden;
+    let watchdog: ReturnType<typeof setTimeout>;
+    const checkRendering = () => {
+      clearTimeout(watchdog);
+      const startFrames = frames;
+      // A frame-count-only check never completes when the compositor stalls.
+      watchdog = setTimeout(() => {
+        if (visible && frames - startFrames < 24) {
+          particles.length = Math.min(8, particles.length);
+          document.documentElement.dataset.quality = 'minimal';
+        }
+      }, 1500);
+    };
     const particles = Array.from({ length: low ? 8 : matchMedia('(pointer: coarse)').matches ? 12 : 28 }, (_, i) => ({
       x: (i * 0.61803398875) % 1, y: (i * 0.38196601125 + 0.15) % 1, r: 0.7 + (i % 3) * 0.45, speed: 0.006 + (i % 5) * 0.0015,
     }));
@@ -22,9 +34,10 @@ export function Background({ enabled }: { enabled: boolean }) {
     };
     const draw = (time: number) => {
       if (!visible) return;
+      frames++;
       const delta = last ? Math.min((time - last) / 1000, 0.05) : 0;
       if (last && ++samples < 180 && time - last > 28) slow++;
-      if (samples === 180 && slow > 65) { particles.length = Math.min(8, particles.length); document.documentElement.dataset.quality = 'low'; }
+      if (samples === 180 && slow > 65 && document.documentElement.dataset.quality !== 'minimal') { particles.length = Math.min(8, particles.length); document.documentElement.dataset.quality = 'low'; }
       last = time;
       ctx.clearRect(0, 0, width, height);
       ctx.fillStyle = document.documentElement.dataset.theme === 'dark' ? 'rgba(244,187,78,0.40)' : 'rgba(159,105,29,0.32)';
@@ -38,11 +51,12 @@ export function Background({ enabled }: { enabled: boolean }) {
     const onVisibility = () => {
       visible = !document.hidden; cancelAnimationFrame(raf); last = 0;
       document.documentElement.dataset.visibility = visible ? 'visible' : 'hidden';
-      if (visible) raf = requestAnimationFrame(draw);
+      if (visible) { raf = requestAnimationFrame(draw); checkRendering(); }
+      else clearTimeout(watchdog);
     };
-    resize(); raf = requestAnimationFrame(draw);
+    resize(); raf = requestAnimationFrame(draw); checkRendering();
     addEventListener('resize', resize); document.addEventListener('visibilitychange', onVisibility);
-    return () => { cancelAnimationFrame(raf); ctx.clearRect(0, 0, width, height); removeEventListener('resize', resize); document.removeEventListener('visibilitychange', onVisibility); };
+    return () => { clearTimeout(watchdog); cancelAnimationFrame(raf); ctx.clearRect(0, 0, width, height); removeEventListener('resize', resize); document.removeEventListener('visibilitychange', onVisibility); };
   }, [enabled]);
   useEffect(() => {
     if (!enabled || !matchMedia('(pointer: fine)').matches) return;
