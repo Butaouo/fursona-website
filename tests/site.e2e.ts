@@ -122,11 +122,13 @@ test('light and dark screens have no serious accessibility violations', async ({
     expect(result.violations).toEqual([]);
   }
 });
-test('compact phone and tablet layouts retain full artwork and reachable controls in both languages', async ({ page }) => {
+test('compact phone and tablet layouts retain full artwork and reachable controls in both languages', async ({ page }, info) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const width of [320, 768]) {
     await page.setViewportSize({ width, height: 960 });
-    // Mobile WebKit commits the layout viewport on the next rendering update.
+    // Initialize each simulated device before navigation, as Playwright recommends.
+    // A live mobile resize can change innerWidth before its device-width layout resets.
+    await page.goto('./');
     await expect.poll(() => page.evaluate(() => innerWidth)).toBe(width);
     for (const language of ['zh-TW', 'en']) {
       if (await page.locator('html').getAttribute('lang') !== language)
@@ -139,6 +141,7 @@ test('compact phone and tablet layouts retain full artwork and reachable control
       expect(artwork!.x).toBeGreaterThanOrEqual(0);
       expect(artwork!.x + artwork!.width).toBeLessThanOrEqual(width);
     }
+    if (width === 320) await page.screenshot({ path: `reports/${info.project.name}-320-en.png` });
     await page.getByRole('button', { name: '切換為繁體中文', exact: true }).click();
   }
 });
