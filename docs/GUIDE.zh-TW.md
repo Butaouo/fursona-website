@@ -2,11 +2,11 @@
 
 ## 目前狀態
 
-網站六項功能的程式已實作，正式建置與 6 項單元測試通過。GitHub 公開專案已建立，但目前遠端只有初始化的 README。網站尚未部署，跨瀏覽器測試與 Lighthouse 尚未執行，不能視為正式驗收完成。
+完整網站原始碼、五張原始獸設素材、最佳化圖片、測試與部署設定均保存在 GitHub。實際發布狀態、修復紀錄與驗收數據請見 `docs/VERIFICATION.md`，不以程式存在或建置成功代替正式網站驗證。
 
 - 專案：https://github.com/Butaouo/fursona-website
-- 預計網址：https://Butaouo.github.io/fursona-website/（尚未部署）
-- 阻礙：現有 GitHub 連接寫入時回傳 HTTP 403；雲端瀏覽器無法安全恢復登入工作階段。
+- GitHub Pages：https://butaouo.github.io/fursona-website/
+- GitHub API 寫入曾回傳 HTTP 403，修復工作已透過使用者授權的 GitHub 網頁編輯器提交。
 - 完整實測紀錄：`docs/VERIFICATION.md`；外部連結 HTTP 檢查：`docs/LINK_CHECKS.json`。
 
 ## 主要技術
@@ -33,14 +33,14 @@ React、TypeScript、Vite、Tailwind CSS、Motion for React、i18next。背景�
 
 ## 自動部署設定
 
-`.github/workflows/deploy.yml` 已準備好：每次推送 main 分支，會安裝鎖定版本套件、執行單元測試、正式建置、45 項瀏覽器測試及手機／桌面 Lighthouse。檢查通過後才部署 Pages，並檢查正式 HTML。失敗會保留測試報告，不會假裝部署成功。
+`.github/workflows/deploy.yml`：每次推送 main 分支，會安裝鎖定版本套件、執行 6 項單元測試、TypeScript、正式建置、50 項瀏覽器測試及手機／桌面 Lighthouse。檢查通過後才部署 Pages，並檢查正式 HTML。失敗會保留測試報告並阻止部署。原有 45 項測試皆保留，另增加 320px／768px 雙語版面案例，於五種設定執行。
 
-Vite 的正式路徑為 `/fursona-website/`。Pages 的來源需設為 GitHub Actions；這仍屬尚待代理完成的部署工作，不要求你自行編寫程式或設定流程。
+Vite 的正式路徑為 `/fursona-website/`，Pages 的來源已設定為 GitHub Actions。修改內容後推送 main 即可觸發整套流程；若驗證失敗，請從 Actions 的 verify 日誌及 verification artifact 查看原因。
 
 ## 已知限制
 
-- 尚無瀏覽器視覺驗證、真實 iPhone／Android／Windows 裝置測試或動畫 FPS 量測。
-- Lighthouse 尚無實測分數；85／90 分、LCP 2.5 秒與 CLS 0.1 都是待驗收門檻。
+- CI 以 Chromium、Firefox、WebKit 執行桌面及手機模擬測試；未宣稱真實 iPhone、Android、Windows Edge 或 macOS Safari 裝置實測。
+- Lighthouse 的實際分數與環境列於驗收文件；目前沒有真實訪客 INP 或實體裝置 60 FPS 量測。
+- 畫面更新速度過低時會自動減少模糊與連續位移，保留半透明表面、高光、角色圖片與操作回饋；減少動態效果及手動暫停設定皆受到尊重。
 - 外部連結收到 HTTP 200，僅證明連線成功，不代表社群登入或平台內全部操作已驗證。
 - Apple Music 的跨網域播放器載入不代表完整歌曲可播放；保留合法試聽和跳轉。
-- 公開專案已建立，但程式上傳、Pages 開通、首次部署與再次推送自動部署驗證仍須完成。
