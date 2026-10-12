@@ -7,6 +7,7 @@ import { Glass } from './Glass';
 export function Socials() {
   const { t } = useTranslation();
   const [copied, setCopied] = useState('');
+  const [announcement, setAnnouncement] = useState<{ name: string; sequence: number } | null>(null);
   const [fallback, setFallback] = useState<Social | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const timeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -14,9 +15,11 @@ export function Socials() {
   useEffect(() => { if (fallback) dialog.current?.showModal(); }, [fallback]);
   const copy = async (social: Social) => {
     if (await copyText(social.value)) {
+      // Keep the live message available after the short visual checkmark expires.
+      setAnnouncement(previous => ({ name: social.name, sequence: (previous?.sequence ?? 0) + 1 }));
       setCopied(social.id); if (timeout.current) clearTimeout(timeout.current);
       timeout.current = setTimeout(() => setCopied(''), 2800);
-    } else setFallback(social);
+    } else { setAnnouncement(null); setFallback(social); }
   };
   return <Glass className="social-panel">
     <div className="panel-topline"><span className="eyebrow">{t('socialsLabel')}</span><Icon name="spark" /></div>
@@ -27,7 +30,7 @@ export function Socials() {
         return s.action === 'copy' ? <button type="button" className={`social-link ${copied === s.id ? 'copied' : ''}`} key={s.id} onClick={() => void copy(s)} aria-label={`${t('copy')} ${s.name} ${s.value}`} title={t('copyHelp', { name: s.name })}>{content}</button> : <a className="social-link" key={s.id} href={s.href} target={s.id === 'email' ? undefined : '_blank'} rel={s.id === 'email' ? undefined : 'noopener noreferrer'} aria-label={`${s.name} ${s.value}${s.id === 'email' ? '' : ` (${t('external')})`}`}>{content}</a>;
       })}
     </div>
-    <div className="sr-only" role="status" aria-live="polite">{copied ? t('copied', { name: visibleSocials().find(s => s.id === copied)?.name }) : ''}</div>
+    <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{announcement && <span key={announcement.sequence}>{t('copied', { name: announcement.name })}</span>}</div>
     <dialog className="copy-dialog" ref={dialog} aria-labelledby="copy-dialog-title" onClose={() => setFallback(null)}>
       <button className="icon-button dialog-close" type="button" onClick={() => dialog.current?.close()} aria-label={t('close')}><Icon name="close" /></button>
       <h3 id="copy-dialog-title">{fallback?.name}</h3><p>{t('copyFailed')}</p><input readOnly aria-label={t('account')} value={fallback?.value ?? ''} onFocus={e => e.currentTarget.select()} /><p>{t('copyHelp', { name: fallback?.name })}</p>
