@@ -20,6 +20,8 @@ export function Background({ enabled }: { enabled: boolean }) {
         if (visible && frames - startFrames < 24) {
           particles.length = Math.min(8, particles.length);
           document.documentElement.dataset.quality = 'minimal';
+          cancelAnimationFrame(raf);
+          ctx.clearRect(0, 0, width, height);
         }
       }, 1500);
     };
@@ -33,7 +35,7 @@ export function Background({ enabled }: { enabled: boolean }) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
     const draw = (time: number) => {
-      if (!visible) return;
+      if (!visible || document.documentElement.dataset.quality === 'minimal') return;
       frames++;
       const delta = last ? Math.min((time - last) / 1000, 0.05) : 0;
       if (last && ++samples < 180 && time - last > 28) slow++;
