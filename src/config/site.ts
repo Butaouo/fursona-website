@@ -13,8 +13,8 @@ export const site = {
     fullName: { 'zh-TW': '哈古久天', en: 'Lyont HaGoo LongDay' },
     species: { 'zh-TW': '貓狐', en: 'Cat × Fox' },
     intro: { 'zh-TW': '我是哈古久天、叫我久天就行！', en: 'I’m HaGoo LongDay. Just call me LongDay!' },
-    tagline: { 'zh-TW': '留一點暖光，給相遇的你。', en: 'A little warmth for everyone I meet.' },
-    traits: { 'zh-TW': ['沉穩', '可愛', '有一點傲嬌'], en: ['Calm', 'Cute', 'A little tsundere'] },
+    tagline: { 'zh-TW': '日落，予你。', en: 'A little warmth for everyone I meet.' },
+    traits: { 'zh-TW': ['沉穩', '可愛', '傲嬌'], en: ['Calm', 'Cute', 'A little tsundere'] },
   },
   images: {
     hero: 'images/lyont-hero.webp',
