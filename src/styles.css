@@ -40,5 +40,6 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--glass-edge)
 :root[data-quality=minimal] .glass-optics:before{filter:none;transform:none}
 :root[data-quality=minimal] .ambient-orb{filter:none;animation:none;opacity:.25}
 :root[data-quality=minimal] .ambient-grain{display:none}
+:root[data-quality=minimal] .ambient canvas{display:none}
 :root[data-quality=minimal] .art-float,:root[data-quality=minimal] .floating-social,:root[data-quality=minimal] .heading-star{animation:none}
 :root[data-quality=minimal] .art-parallax{transform:none;transition:none}
