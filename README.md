@@ -4,9 +4,11 @@ A bilingual, fursona-centered personal site with warm liquid-glass surfaces, sup
 
 繁體中文交付與修改說明：**docs/GUIDE.zh-TW.md**。
 
-**Target repository:** https://github.com/Butaouo/fursona-website  
-**Target Pages URL:** https://Butaouo.github.io/fursona-website/  
-These are deployment targets, not proof of deployment. See docs/VERIFICATION.md for the actual status.
+**Repository:** https://github.com/Butaouo/fursona-website
+
+**GitHub Pages:** https://butaouo.github.io/fursona-website/
+
+See **docs/VERIFICATION.md** for actual deployment evidence, repair details, test counts, Lighthouse measurements, and testing limits.
 
 ## Development
 
@@ -28,7 +30,7 @@ In **src/config/site.ts**, update `music.track`, `artist`, `album`, `artwork`, `
 
 ## Deployment
 
-The included **.github/workflows/deploy.yml** builds and verifies each main-branch push, runs Chromium/Firefox/WebKit and mobile-emulation checks, audits Lighthouse, then deploys the verified dist artifact through GitHub Pages. Pull requests run checks only. Failure in verification prevents deployment. No third-party deployment service is required. The repository is public. GitHub Pages must use GitHub Actions as its build source; the deployment setup is managed by the agent.
+The included **.github/workflows/deploy.yml** builds and verifies each main-branch push, runs 50 Chromium/Firefox/WebKit and mobile-emulation checks, audits Lighthouse, then deploys the verified dist artifact through GitHub Pages. Pull requests run checks only. Failure in verification prevents deployment. No third-party deployment service is required. The repository is public and Pages uses GitHub Actions as its build source. Browser tests use a virtual display on Linux; original assertions remain active.
 
 Vite base is **/fursona-website/**. A future custom domain can override the base through `SITE_BASE=/`, with matching canonical/open-graph URLs in `index.html` and `site.url`. The site uses section anchors, so refreshes do not require SPA route rewriting.
 
