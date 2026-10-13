@@ -4,17 +4,18 @@ import { asset, site, type Language } from '../config/site';
 import { Glass } from './Glass';
 import { BrandIcon, Icon } from './Icon';
 import { Artwork } from './Artwork';
+import { AnimatedText } from './AnimatedText';
 export function Hero({ language, animated }: { language: Language; animated: boolean }) {
   const { t } = useTranslation();
   return <section className="hero page-width" id="home" aria-labelledby="hero-heading">
     <div className="hero-copy">
       <div className="eyebrow"><span className="sun-dot" />{t('welcome')}</div>
-      <p className="hero-hello">{t('hello')}</p>
-      <h1 id="hero-heading" className={language === 'en' ? 'english-heading' : ''}>{t('heroTitle')}<span className="heading-star" aria-hidden="true">✳</span></h1>
+      <p className="hero-hello"><AnimatedText>{t('hello')}</AnimatedText></p>
+      <h1 id="hero-heading" className={language === 'en' ? 'english-heading' : ''}><AnimatedText>{t('heroTitle')}</AnimatedText><span className="heading-star" aria-hidden="true">✳</span></h1>
       <p className="hero-fullname">{site.person.fullName.en}</p>
-      <p className="hero-intro">{site.person.intro[language]}</p>
-      <p className="hero-tagline">{site.person.tagline[language]}</p>
-      <div className="hero-actions"><a href="#connect" className="button button-primary">{t('sayHello')}<Icon name="arrow" /></a><a href="#fursona" className="button button-secondary">{t('discover')}<Icon name="down" /></a></div>
+      <p className="hero-intro"><AnimatedText>{site.person.intro[language]}</AnimatedText></p>
+      <p className="hero-tagline"><AnimatedText>{site.person.tagline[language]}</AnimatedText></p>
+      <div className="hero-actions"><a href="#connect" className="button button-primary"><AnimatedText>{t('sayHello')}</AnimatedText><Icon name="arrow" /></a><a href="#fursona" className="button button-secondary"><AnimatedText>{t('discover')}</AnimatedText><Icon name="down" /></a></div>
       <Glass className="identity-card"><img src={asset(site.images.avatar)} alt={t('avatarAlt')} width="58" height="58" /><div><span className="identity-label">{t('identity')}</span><div className="traits">{site.person.traits[language].map(trait => <span key={trait}>{trait}</span>)}</div></div><Icon name="spark" /></Glass>
       <a className="scroll-hint" href="#connect"><span className="scroll-line" />{t('scroll')}<Icon name="down" /></a>
     </div>
