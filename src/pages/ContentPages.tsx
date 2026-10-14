@@ -78,7 +78,7 @@ function Typewriter({ brief, full }: { brief: string; full: string }) {
   const enabled = useContext(AnimationContext);
   const [text, setText] = useState(brief);
   useEffect(()=>{if(!enabled){setText(full);return;} setText(brief);let frame=0;const start=performance.now();const tick=(now:number)=>{const elapsed=now-start;const b=Array.from(brief),f=Array.from(full);setText(elapsed<220?b.slice(0,Math.ceil(b.length*(1-elapsed/220))).join(''):f.slice(0,Math.ceil(f.length*Math.min(1,(elapsed-220)/480))).join(''));if(elapsed<700)frame=requestAnimationFrame(tick);};frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame);},[brief,full,enabled]);
-  return <p className="product-description" aria-label={full}><span className="description-reserve" aria-hidden="true">{full}</span><span className="description-ink" aria-hidden="true">{text}</span></p>;
+  return <p className="product-description"><span className="sr-only">{full}</span><span className="description-reserve" aria-hidden="true">{full}</span><span className="description-ink" aria-hidden="true">{text}</span></p>;
 }
 function ProductDetail({ product:p, language, onClose }: Props & { product:Product; onClose:()=>void }) {
   const dialog=useRef<HTMLDivElement>(null);
