@@ -14,7 +14,6 @@ import { Icon } from './components/Icon';
 import { AnimationContext } from './components/AnimatedText';
 import { useRoute } from './router';
 import { copy } from './content';
-import './phase2.css';
 const ContentPages = lazy(() => import('./pages/ContentPages'));
 
 export default function App() {
