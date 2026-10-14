@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type CSSProperties } from 'react';
+import { Fragment, createContext, useContext, useEffect, useState, type CSSProperties } from 'react';
 import { m } from 'motion/react';
 
 export const AnimationContext = createContext(true);
@@ -18,12 +18,18 @@ export function AnimatedText({ children }: { children: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [children, enabled]);
   const text = enabled ? display : children;
-  const chars = typeof Intl.Segmenter === 'function'
-    ? Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text), x => x.segment)
-    : Array.from(text);
+  const graphemes = (value: string) => typeof Intl.Segmenter === 'function'
+    ? Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(value), x => x.segment)
+    : Array.from(value);
+  // Keep Latin words together while allowing CJK characters to wrap naturally.
+  let index = 0;
+  const letters = text.split(/([A-Za-z0-9]+(?:['’][A-Za-z0-9]+)*)/).map((part, group) => {
+    const chars = graphemes(part).map(char => <span className="animated-character" key={index} style={{ '--delay': `${Math.min(index++ * 8, 140)}ms` } as CSSProperties}>{char}</span>);
+    return /^[A-Za-z0-9]/.test(part) ? <span className="animated-word" key={group}>{chars}</span> : <Fragment key={group}>{chars}</Fragment>;
+  });
   return <m.span layout={enabled ? 'size' : false} transition={{ layout: { duration: .45, ease: [.22, 1, .36, 1] } }} className={`animated-label label-${enabled ? phase : 'idle'}`}>
     <span className="sr-only">{children}</span>
     <span className="label-reserve" aria-hidden="true">{children}</span>
-    <span className="label-ink" aria-hidden="true" key={text}>{chars.map((char, i) => <span key={i} style={{ '--delay': `${Math.min(i * 8, 140)}ms` } as CSSProperties}>{char}</span>)}</span>
+    <span className="label-ink" aria-hidden="true" key={text}>{letters}</span>
   </m.span>;
 }
