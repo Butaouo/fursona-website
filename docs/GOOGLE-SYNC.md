@@ -55,11 +55,11 @@ Google Docs → GitHub Actions（伺服器端唯讀同步、圖片轉存與驗�
 
 ## Products 欄位（A～O）
 
-`id,name,nameEn,imageDriveId,summary,summaryEn,description,descriptionEn,price,status,statusEn,order,publishStatus`
+`id,name,nameEn,imageDriveId,summary,summaryEn,description,descriptionEn,price,status,statusEn,order,publishStatus,detailImageDriveIds`
 
 必填 id、name、imageDriveId；建議填 summary、description、status、order。price 可留空，否則以你輸入的完整文字顯示（包含幣別）。publishStatus 改為 published 才展示。status 是對外狀態，如「準備中」或「已完售」，不等於發布控制。商品圖片上傳到同一專用 Drive 發布資料夾，再把檔案 ID 填入 imageDriveId；不使用私人圖片 URL。網站只有展示，沒有購物車、付款或虛構售價。
 
-資料格式保留 `images` 陣列作未來多張詳細圖片擴充；目前 Sheet 每件商品同步一張主圖，完整說明會逐字展開。
+`detailImageDriveIds` 選填最多八個詳細圖片的 Drive 檔案 ID，以半形逗號分隔。網站依欄位順序顯示；所有圖片都會轉存成本地資源。點擊卡片後主圖共享轉場、簡介逐字刪除並展開完整說明，詳細圖片接著淡入。
 
 ## 維護與限制
 
