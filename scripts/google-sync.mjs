@@ -86,7 +86,13 @@ export async function sync({ env=process.env, request=fetch, output=resolve('pub
       const blocks=await parseDocument(document,row.tabId,fromUri);
       catalog.articles.push({id:row.id,kind:row.kind,title:localized(row.title,row.titleEn),summary:localized(row.summary,row.summaryEn),date:row.date,...(row.series?{series:row.series,chapter:Number(row.chapter)||0}:{}),...(row.coverDriveId?{cover:(await fromDrive(row.coverDriveId)).src}:{}),blocks});
     }
-    for(const row of products.filter(r=>published(r))){if(!row.name || !row.imageDriveId)fail('Published products require name and imageDriveId');catalog.products.push({id:row.id,name:localized(row.name,row.nameEn),summary:localized(row.summary,row.summaryEn),description:localized(row.description,row.descriptionEn),status:localized(row.status,row.statusEn),order:Number(row.order)||0,...(row.price?{price:row.price}:{}),image:(await fromDrive(row.imageDriveId)).src});}
+    for(const row of products.filter(r=>published(r))){
+      if(!row.name || !row.imageDriveId)fail('Published products require name and imageDriveId');
+      const detailIds=(row.detailImageDriveIds||'').split(',').map(id=>id.trim()).filter(Boolean);
+      if(detailIds.length>8)fail('A product supports up to eight detail images');
+      const images=[];for(const id of detailIds)images.push((await fromDrive(id)).src);
+      catalog.products.push({id:row.id,name:localized(row.name,row.nameEn),summary:localized(row.summary,row.summaryEn),description:localized(row.description,row.descriptionEn),status:localized(row.status,row.statusEn),order:Number(row.order)||0,...(row.price?{price:row.price}:{}),image:(await fromDrive(row.imageDriveId)).src,...(images.length?{images}:{})});
+    }
     if(env.GOOGLE_RELATIONSHIP_FOLDER_ID){const folder=validId(env.GOOGLE_RELATIONSHIP_FOLDER_ID);const q=`'${folder}' in parents and trashed = false and name contains 'relationships-published.'`;const result=await(await get(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType),nextPageToken&pageSize=100`)).json();const files=(result.files||[]).filter(f=>/^relationships-published\.(png|jpe?g|webp)$/i.test(f.name));if(files.length!==1)fail('Relationship folder must contain exactly one relationships-published image');catalog.relationship={src:(await fromDrive(files[0].id)).src,alt:localized('角色關係網','Character relationships')};}
     readCatalog(catalog);
     if(!catalog.articles.length&&!catalog.products.length&&!catalog.relationship && env.GOOGLE_ALLOW_EMPTY_PUBLICATION!=='true')fail('Empty publication refused; explicit GOOGLE_ALLOW_EMPTY_PUBLICATION is required');
