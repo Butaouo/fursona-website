@@ -5,6 +5,8 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '17,47 * * * *'
 
 permissions:
   contents: read
@@ -15,8 +17,9 @@ concurrency:
 
 jobs:
   verify:
+    if: github.event_name != 'schedule' || vars.GOOGLE_SYNC_ENABLED == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v6
@@ -25,6 +28,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Sync explicitly published Google content
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.GOOGLE_SYNC_ENABLED == 'true'
+        env:
+          GOOGLE_SYNC_ENABLED: 'true'
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_PUBLICATION_SHEET_ID: ${{ secrets.GOOGLE_PUBLICATION_SHEET_ID }}
+          GOOGLE_RELATIONSHIP_FOLDER_ID: ${{ secrets.GOOGLE_RELATIONSHIP_FOLDER_ID }}
+          GOOGLE_ALLOW_EMPTY_PUBLICATION: ${{ vars.GOOGLE_ALLOW_EMPTY_PUBLICATION }}
+        run: node scripts/google-sync.mjs
       - name: TypeScript and production build
         id: build
         run: npm run build
@@ -47,12 +59,12 @@ jobs:
             test-results/
           retention-days: 30
       - name: Upload production site
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
   deploy:
-    if: github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: verify
     runs-on: ubuntu-24.04
     timeout-minutes: 10
