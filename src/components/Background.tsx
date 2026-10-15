@@ -68,6 +68,9 @@ export function Background({ enabled }: { enabled: boolean }) {
       raf = requestAnimationFrame(() => {
         document.documentElement.style.setProperty('--pointer-x', `${(e.clientX / innerWidth - 0.5) * 18}px`);
         document.documentElement.style.setProperty('--pointer-y', `${(e.clientY / innerHeight - 0.5) * 12}px`);
+        document.documentElement.style.setProperty('--light-x', `${e.clientX / innerWidth * 100}%`);
+        document.documentElement.style.setProperty('--light-y', `${e.clientY / innerHeight * 100}%`);
+        document.documentElement.style.setProperty('--light-angle', `${115 + e.clientX / innerWidth * 30}deg`);
       });
     };
     addEventListener('pointermove', move, { passive: true });
