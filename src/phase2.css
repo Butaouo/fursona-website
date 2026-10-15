@@ -9,6 +9,8 @@
 .art-halo{background:none}
 @keyframes longday-drift{0%,100%{transform:translate3d(var(--pointer-x),var(--pointer-y),0) scale(1)}23%{transform:translate3d(3vw,-2vh,0) scale(1.03)}57%{transform:translate3d(-2vw,4vh,0) scale(.98)}81%{transform:translate3d(2vw,1vh,0) scale(1.04)}}
 .animated-label{display:inline-grid;position:relative;vertical-align:baseline;max-width:100%;transition:width .5s,height .5s;isolation:isolate}
+/* Resolve the label's theme color with the button background in the same style pass. */
+.button-primary .animated-label,.button-primary .label-ink{color:var(--button-text)}
 .label-reserve,.label-ink{grid-area:1/1;min-width:0}.label-reserve{visibility:hidden}.label-ink{align-self:start;overflow:clip;overflow-clip-margin:.12em}.label-ink .animated-character{white-space:pre-wrap;display:inline-block}.label-out .label-ink .animated-character{animation:letter-out .16s both;animation-delay:calc(var(--delay) * .4)}.label-in .label-ink .animated-character{animation:letter-in .36s both;animation-delay:var(--delay)}.animated-word{display:inline-block;white-space:nowrap}
 @keyframes letter-out{to{transform:translateY(-.6em);opacity:0;filter:blur(1px)}}@keyframes letter-in{from{transform:translateY(.8em);opacity:0;filter:blur(2px)}to{transform:translateY(0);opacity:1;filter:none}}
 .desktop-nav{gap:22px}.desktop-nav a[aria-current=page]{color:var(--text)}.desktop-nav a[aria-current=page]:after{transform:scaleX(1)}
