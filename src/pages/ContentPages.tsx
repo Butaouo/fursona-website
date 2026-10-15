@@ -97,7 +97,8 @@ export default function ContentPages({ route, language }: Props & { route:string
   const [catalog,setCatalog]=useState<Catalog|null>(null);
   const [error,setError]=useState(false);
   const [attempt,setAttempt]=useState(0);
-  useEffect(()=>{const controller=new AbortController();setError(false);fetch(asset('content/catalog.json'),{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('Unavailable');return r.json();}).then(readCatalog).then(setCatalog).catch(e=>{if(e.name!=='AbortError')setError(true);});return()=>controller.abort();},[attempt]);
+  const needsCatalog=['archive','relationships','shop'].includes(route.split('/')[0]);
+  useEffect(()=>{if(!needsCatalog)return;const controller=new AbortController();setError(false);fetch(asset('content/catalog.json'),{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('Unavailable');return r.json();}).then(readCatalog).then(setCatalog).catch(()=>{if(!controller.signal.aborted)setError(true);});return()=>controller.abort();},[attempt,needsCatalog]);
   if(route==='about')return <div className="content-page page-width"><PageTitle title="about" intro="aboutIntro" language={language}/><p className="about-tagline"><AnimatedText>{site.person.tagline[language]}</AnimatedText></p><Gallery language={language}/><a className="button button-primary" href="#connect">{language==='en'?'Find me online':'來找我聊聊'} ↗</a></div>;
   if(!['archive','relationships','shop'].includes(route.split('/')[0]))return <div className="content-page page-width"><Empty title={copy('notFound',language)}/><a href="#/">{copy('home',language)}</a></div>;
   if(error)return <div className="content-page page-width"><Empty title={copy('loadError',language)}/><button className="button button-secondary" onClick={()=>setAttempt(x=>x+1)}>{copy('retry',language)}</button></div>;
