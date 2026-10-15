@@ -118,6 +118,9 @@ test('light and dark screens have no serious accessibility violations', async ({
   for (const theme of ['light', 'dark']) {
     await page.getByTestId(`theme-${theme}`).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    // A data attribute can update before the browser resolves inherited text styles.
+    // Verify the actual visible button label, then audit the fully applied theme.
+    await expect(page.locator('.button-primary .label-ink')).toHaveCSS('color', theme === 'dark' ? 'rgb(39, 32, 20)' : 'rgb(255, 250, 240)');
     const result = await new AxeBuilder({ page }).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
     expect(result.violations).toEqual([]);
   }
