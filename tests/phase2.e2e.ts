@@ -14,7 +14,28 @@ test.afterEach(async ({ page }, info) => {
   expect(failures.get(page), 'new-page console, runtime and local resource errors').toEqual([]);
   if (info.status === 'passed') await info.attach('phase2-page', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
 });
-test('five routes survive refresh, history and language switching',async({page})=>{const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));for(const route of ['archive','relationships','shop','about']){await page.goto(`./#/${route}`);await expect(page.locator('main h1')).toBeVisible();await page.reload();await expect(page.locator('main h1')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}await page.getByRole('link',{name:'商品',exact:true}).click();await expect(page).toHaveURL(/#\/shop$/);await page.getByRole('button',{name:'Switch to English',exact:true}).click();await expect(page.locator('html')).toHaveAttribute('lang','en');await expect(page).toHaveURL(/#\/shop$/);await page.goBack();await expect(page).toHaveURL(/#\/about$/);expect(errors).toEqual([]);});
+test('five routes survive refresh, history and language switching',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  const titles:Record<string,string>={archive:'創作',relationships:'關係網',shop:'商品',about:'關於'};
+  for(const route of ['archive','relationships','shop','about']){
+    await page.goto(`./#/${route}`);
+    // The previous page remains visible during exit; wait for the target page.
+    await expect(page.locator('main h1')).toContainText(titles[route]);
+    await page.reload();
+    await expect(page.locator('main h1')).toContainText(titles[route]);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
+  await page.getByRole('link',{name:'商品',exact:true}).click();
+  await expect(page).toHaveURL(/#\/shop$/);
+  await expect(page.locator('main h1')).toContainText('商品');
+  await page.getByRole('button',{name:'Switch to English',exact:true}).click();
+  await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(page).toHaveURL(/#\/shop$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/#\/about$/);
+  await expect(page.locator('main h1')).toContainText('About');
+  expect(errors).toEqual([]);
+});
 test('reader keeps text and illustrations ordered, supports chapters and safe zoom',async({page})=>{await page.goto('./#/archive/test-story');await expect(page.locator('.reader-body>p').first()).toContainText('<script>alert(1)</script>');expect(await page.locator('.reader-body').evaluate(el=>[...el.children].map(x=>x.tagName).slice(0,4))).toEqual(['H2','P','FIGURE','P']);await page.getByRole('button',{name:'放大: 測試插畫',exact:true}).click();await expect(page.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).not.toBeVisible();await page.getByRole('link',{name:/下一章/}).click();await expect(page).toHaveURL(/test-story-2$/);await expect(page.getByRole('link',{name:/上一章/})).toBeVisible();});
 test('shop expands and closes with keyboard and restores scroll',async({page})=>{await page.goto('./#/shop');await expect(page.locator('.product-card')).toHaveCount(4);await page.locator('.product-card').first().scrollIntoViewIfNeeded();const top=await page.evaluate(()=>scrollY);await page.locator('.product-card').first().click();await expect(page.getByRole('dialog')).toBeVisible();await expect(page.locator('.description-ink')).toContainText('目前沒有商品販售');await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).not.toBeVisible();expect(Math.abs(await page.evaluate(()=>scrollY)-top)).toBeLessThan(4);await page.emulateMedia({reducedMotion:'reduce'});await page.locator('.product-card').nth(1).click();await expect(page.getByRole('dialog')).toBeVisible();await page.getByRole('button',{name:/返回/}).click();await expect(page.getByRole('dialog')).not.toBeVisible();});
 test('relationship zoom, pan, reset and fullscreen close work',async({page})=>{await page.goto('./#/relationships');await expect(page.locator('.map-stage img')).toBeVisible();await page.getByRole('button',{name:'放大',exact:true}).click();await expect(page.locator('.map-tools output')).toHaveText('125%');await page.locator('.map-stage').focus();await page.keyboard.press('ArrowRight');await expect(page.locator('.map-transform')).toHaveCSS('transform',/30/);await page.getByRole('button',{name:'恢復原始比例',exact:true}).click();await expect(page.locator('.map-tools output')).toHaveText('100%');await page.getByRole('button',{name:'全螢幕檢視',exact:true}).click();await expect(page.getByRole('dialog')).toBeVisible();await page.getByRole('button',{name:'關閉',exact:true}).click();await expect(page.getByRole('dialog')).not.toBeVisible();});
