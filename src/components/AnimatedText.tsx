@@ -2,6 +2,7 @@ import { Fragment, createContext, useContext, useEffect, useState, type CSSPrope
 import { m } from 'motion/react';
 
 export const AnimationContext = createContext(true);
+const segmenter = typeof Intl.Segmenter === 'function' ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : null;
 /** One accessible text node; the decorative graphemes never become separate announcements. */
 export function AnimatedText({ children }: { children: string }) {
   const enabled = useContext(AnimationContext);
@@ -18,12 +19,14 @@ export function AnimatedText({ children }: { children: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [children, enabled]);
   const text = enabled ? display : children;
-  const graphemes = (value: string) => typeof Intl.Segmenter === 'function'
-    ? Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(value), x => x.segment)
+  const graphemes = (value: string) => segmenter
+    ? Array.from(segmenter.segment(value), x => x.segment)
     : Array.from(value);
   // Keep Latin words together while allowing CJK characters to wrap naturally.
   let index = 0;
-  const letters = text.split(/([A-Za-z0-9]+(?:['’][A-Za-z0-9]+)*)/).map((part, group) => {
+  // Initial and settled labels need one text node, not hundreds of layout boxes.
+  // Build graphemes only during a real language transition.
+  const letters = !enabled || phase === 'idle' ? text : text.split(/([A-Za-z0-9]+(?:['’][A-Za-z0-9]+)*)/).map((part, group) => {
     const chars = graphemes(part).map(char => <span className="animated-character" key={index} style={{ '--delay': `${Math.min(index++ * 8, 140)}ms` } as CSSProperties}>{char}</span>);
     return /^[A-Za-z0-9]/.test(part) ? <span className="animated-word" key={group}>{chars}</span> : <Fragment key={group}>{chars}</Fragment>;
   });

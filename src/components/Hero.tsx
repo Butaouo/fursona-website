@@ -24,7 +24,7 @@ export function Hero({ language, animated }: { language: Language; animated: boo
       <span className="orbit-caption" aria-hidden="true">A LITTLE SUNSHINE</span>
       <div className="art-parallax"><div className="art-float"><Glass className="art-frame">
         <div className="art-meta"><span>01 / LYONT</span><span>{t('character')}<span className="mini-spark">✳</span></span></div>
-        <Artwork className="hero-image" src={asset(site.images.hero)} srcSet={`${asset(site.images.heroSmall)} 640w, ${asset(site.images.hero)} 1120w`} sizes="(max-width: 760px) 90vw, 46vw" width="1407" height="1760" alt={t('portraitAlt')} fetchPriority="high" decoding="async" />
+        <Artwork className="hero-image" src={asset(site.images.hero)} srcSet={`${asset(site.images.heroSmall)} 640w, ${asset(site.images.hero)} 1120w`} sizes="(max-width: 520px) calc(100vw - 78px), (max-width: 760px) 450px, 46vw" width="1407" height="1760" alt={t('portraitAlt')} fetchPriority="high" decoding="async" />
         <div className="art-caption"><span>{t('heroCaption')}</span><span>久天</span></div>
       </Glass></div></div>
       <a className="floating-social float-instagram glass-button" href={site.socials.find(s => s.id === 'instagram')!.href} target="_blank" rel="noopener noreferrer" aria-label={`Instagram (${t('external')})`}><BrandIcon name="instagram" /></a>
