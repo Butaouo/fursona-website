@@ -10,7 +10,7 @@ A bilingual, fursona-centered personal IP site with warm liquid-glass surfaces, 
 
 See **docs/VERIFICATION.md** for actual deployment evidence, repair details, test counts, Lighthouse measurements, and testing limits.
 
-That report records the original release. Phase 2 adds 25 browser checks to the original 50 and has 18 unit checks; use the current Actions run and its verification artifact for the latest results. Google authorization and real-device testing are separate from automated fixture tests.
+That report records the original release. Phase 3 preserves the existing 75 browser checks and adds 25 motion/branding checks (100 total), with 24 unit checks; use the current Actions run and its verification artifact for the latest results. Google authorization and real-device testing are separate from automated fixture tests.
 
 ## Publish stories, relationship art and products
 
@@ -36,7 +36,7 @@ In **src/config/site.ts**, update `music.track`, `artist`, `album`, `artwork`, `
 
 ## Deployment
 
-The included **.github/workflows/deploy.yml** builds and verifies each main-branch push, runs 75 Chromium/Firefox/WebKit and mobile-emulation checks, audits Lighthouse, then deploys the verified dist artifact through GitHub Pages. Pull requests run checks only. Failure in verification prevents deployment. Google synchronization is opt-in and runs twice per hour after authorization; schedules may be delayed. No third-party deployment service is required. The repository is public and Pages uses GitHub Actions as its build source. Browser tests use a virtual display on Linux; original assertions remain active.
+The included **.github/workflows/deploy.yml** builds and verifies each main-branch push, runs 100 Chromium/Firefox/WebKit and mobile-emulation checks, audits Lighthouse, then deploys the verified dist artifact through GitHub Pages. Pull requests run checks only. Failure in verification prevents deployment. Google synchronization is opt-in and runs twice per hour after authorization; schedules may be delayed. No third-party deployment service is required. The repository is public and Pages uses GitHub Actions as its build source. Browser tests use a virtual display on Linux; original assertions remain active.
 
 Vite base is **/fursona-website/**. A future custom domain can override the base through `SITE_BASE=/`, with matching canonical/open-graph URLs in `index.html` and `site.url`. Pages use hash routes (`#/archive`, `#/relationships`, `#/shop`, `#/about`), so direct links and refreshes work without server rewrites. Original homepage section anchors still work.
 
@@ -45,8 +45,10 @@ Vite base is **/fursona-website/**. A future custom domain can override the base
 - React 19 + TypeScript + Vite 7
 - Tailwind CSS 4 and custom optical CSS
 - Motion for React (lightweight LazyMotion), i18next
-- CSS/SVG reflections, canvas particles and adaptive motion
+- Layered CSS environment lighting, compositor motion, scroll reveals and adaptive quality
 - Playwright + axe, Vitest and Lighthouse
 - Static frontend; Google secrets only in the server-side publication workflow
 
 See **docs/DESIGN.md**, **docs/ASSETS.md** and **docs/VERIFICATION.md** for decisions, provenance and testing limits.
+
+Phase 3 motion architecture and testing scope: [docs/PHASE3.md](docs/PHASE3.md). Google synchronization remains opt-in and unchanged.
