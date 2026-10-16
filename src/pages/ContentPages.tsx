@@ -7,7 +7,7 @@ import { Glass } from '../components/Glass';
 import { Gallery } from '../components/Gallery';
 
 type Props = { language: Language };
-const label = (key: Parameters<typeof copy>[0], language: Language) => <AnimatedText>{copy(key, language)}</AnimatedText>;
+const label = (key: Parameters<typeof copy>[0], language: Language) => <AnimatedText reveal>{copy(key, language)}</AnimatedText>;
 function PageTitle({ title, intro, language }: Props & { title: 'archive' | 'shop' | 'relationships' | 'about'; intro: Parameters<typeof copy>[0] }) {
   return <header className="content-heading"><p className="eyebrow">LONGDAY / {title.toUpperCase()}</p><h1>{label(title, language)}<span aria-hidden="true">.</span></h1><p>{label(intro, language)}</p></header>;
 }
@@ -40,7 +40,7 @@ function Reader({ article, articles, language }: Props & { article: Article; art
   const index = chapters.findIndex(a => a.id === article.id);
   return <article className="reader">
     <a className="text-link" href="#/archive">← {copy('archive', language)}</a>
-    <header className="reader-heading"><p className="eyebrow">{copy(article.kind, language)} / <time dateTime={article.date}>{article.date}</time></p><h1><AnimatedText>{localized(article.title, language)}</AnimatedText></h1><p>{localized(article.summary, language)}</p>{language === 'en' && <small>{copy('original', language)}</small>}</header>
+    <header className="reader-heading"><p className="eyebrow">{copy(article.kind, language)} / <time dateTime={article.date}>{article.date}</time></p><h1><AnimatedText reveal>{localized(article.title, language)}</AnimatedText></h1><p>{localized(article.summary, language)}</p>{language === 'en' && <small>{copy('original', language)}</small>}</header>
     {article.cover && <Media src={article.cover} alt={localized(article.title, language)} className="reader-cover" />}
     <div className="reading-progress" role="progressbar" aria-label={copy('progress', language)} aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}><span style={{ transform: `scaleX(${progress / 100})` }} /></div>
     <div className="reader-layout"><aside className="reader-toc"><h2>{copy('contents', language)}</h2>{chapters.map(a => <a key={a.id} href={`#/archive/${a.id}`} aria-current={a.id === article.id ? 'page' : undefined}>{localized(a.title, language)}</a>)}{article.blocks.map((b, i) => b.type === 'heading' && <button key={i} onClick={() => document.getElementById(`section-${i}`)?.scrollIntoView({ behavior: document.documentElement.dataset.motion === 'still' ? 'instant' : 'smooth' })}>{b.runs.map(r => r.text).join('')}</button>)}</aside>
