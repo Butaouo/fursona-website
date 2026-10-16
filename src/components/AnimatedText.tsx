@@ -4,13 +4,13 @@ import { m } from 'motion/react';
 export const AnimationContext = createContext(true);
 const segmenter = typeof Intl.Segmenter === 'function' ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : null;
 /** One accessible text node; the decorative graphemes never become separate announcements. */
-export function AnimatedText({ children }: { children: string }) {
+export function AnimatedText({ children, reveal = false }: { children: string; reveal?: boolean }) {
   const enabled = useContext(AnimationContext);
   const [display, setDisplay] = useState(children);
-  const [phase, setPhase] = useState('idle');
+  const [phase, setPhase] = useState(enabled && reveal ? 'in' : 'idle');
   useEffect(() => {
     if (!enabled) { setDisplay(children); setPhase('idle'); return; }
-    if (children === display) { setPhase('idle'); return; }
+    if (children === display) { if (!reveal) { setPhase('idle'); return; } const timer = setTimeout(() => setPhase('idle'), 700); return () => clearTimeout(timer); }
     setPhase('out');
     const swap = setTimeout(() => { setDisplay(children); setPhase('in'); }, 220);
     const finish = setTimeout(() => setPhase('idle'), 780);
