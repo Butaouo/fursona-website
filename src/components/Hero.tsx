@@ -11,7 +11,7 @@ export function Hero({ language, animated }: { language: Language; animated: boo
     <div className="hero-copy">
       <div className="eyebrow"><span className="sun-dot" />{t('welcome')}</div>
       <p className="hero-hello"><AnimatedText>{t('hello')}</AnimatedText></p>
-      <h1 id="hero-heading" className={language === 'en' ? 'english-heading' : ''}><AnimatedText>{t('heroTitle')}</AnimatedText><span className="heading-star" aria-hidden="true">✳</span></h1>
+      <h1 id="hero-heading" className={language === 'en' ? 'english-heading' : ''}><AnimatedText reveal>{t('heroTitle')}</AnimatedText><span className="heading-star" aria-hidden="true">✳</span></h1>
       <p className="hero-fullname">{site.person.fullName.en}</p>
       <p className="hero-intro"><AnimatedText>{site.person.intro[language]}</AnimatedText></p>
       <p className="hero-tagline"><AnimatedText>{site.person.tagline[language]}</AnimatedText></p>
