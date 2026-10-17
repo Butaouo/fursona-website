@@ -10,7 +10,9 @@ test('canonical domain, sharing artwork and root asset paths are consistent', as
   await page.goto('./#/shop');
   await expect(page.locator('main h1')).toContainText('商品');
   await page.reload();
-  await expect(page.locator('.product-card')).toHaveCount(4);
+  await expect(page.locator('main h1')).toContainText('商品');
+  const published = await (await page.request.get(new URL('content/catalog.json', baseURL!).href)).json();
+  await expect(page.locator('.product-card')).toHaveCount(published.products.filter((product: { placeholder?: boolean }) => !product.placeholder).length);
   await expect(page.locator('link[rel=canonical]')).toHaveAttribute('href', 'https://longday.tw/');
   await expect(page.locator('meta[property="og:url"]')).toHaveAttribute('content', 'https://longday.tw/');
   for (const selector of ['meta[property="og:image"]', 'meta[name="twitter:image"]']) {

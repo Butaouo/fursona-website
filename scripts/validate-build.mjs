@@ -28,3 +28,6 @@ for (const url of sharing) {
 }
 if (/butaouo\.github\.io|\/fursona-website\//i.test(html)) throw new Error('Legacy domain or base remains in production HTML');
 console.log(JSON.stringify({ domain: 'longday.tw', canonical: 'PASS', sharingImages: sharing.length }));
+
+const { auditPublicBuild } = await import('./public-content.mjs');
+console.log(JSON.stringify(await auditPublicBuild()));
