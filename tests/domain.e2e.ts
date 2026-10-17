@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 
+
 test('canonical domain, sharing artwork and root asset paths are consistent', async ({ page, baseURL }) => {
   const failed: string[] = [];
   page.on('pageerror', error => failed.push(error.message));
@@ -17,11 +18,12 @@ test('canonical domain, sharing artwork and root asset paths are consistent', as
   }
   await page.getByRole('link', { name: '首頁', exact: true }).click();
   await expect(page.locator('#hero-heading')).toBeVisible();
-  await expect.poll(() => page.locator('img').evaluateAll(nodes => nodes.filter(n => n.loading !== 'lazy').every(n => n.complete && n.naturalWidth > 0))).toBe(true);
-  const images = await page.locator('img').evaluateAll(nodes => nodes.map(n => ({ src: n.src, complete: n.complete, width: n.naturalWidth, loading: n.loading })));
+  await expect.poll(() => page.locator('img').evaluateAll((nodes: HTMLImageElement[]) => nodes.filter(n => n.loading !== 'lazy').every(n => n.complete && n.naturalWidth > 0))).toBe(true);
+  const images = await page.locator('img').evaluateAll((nodes: HTMLImageElement[]) => nodes.map(n => ({ src: n.src, complete: n.complete, width: n.naturalWidth, loading: n.loading })));
   for (const image of images) {
     expect(new URL(image.src).pathname).not.toContain('/fursona-website/');
     if (image.loading !== 'lazy') expect(image.complete && image.width > 0).toBe(true);
   }
   expect(failed).toEqual([]);
 });
+
