@@ -3,7 +3,7 @@ import * as chromeLauncher from 'chrome-launcher';
 import { mkdir, writeFile, appendFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 const suppliedUrl = process.env.AUDIT_URL;
-const url = suppliedUrl || 'http://127.0.0.1:4173/fursona-website/';
+const url = suppliedUrl || 'http://127.0.0.1:4173/';
 const server = suppliedUrl ? null : spawn('node', ['node_modules/vite/bin/vite.js', 'preview', '--host', '127.0.0.1', '--port', '4173'], { stdio: 'ignore' });
 let chrome;
 try {
