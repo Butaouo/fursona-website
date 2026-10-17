@@ -7,7 +7,7 @@ export interface Social { id: SocialId; name: string; value: string; href?: stri
 export const site = {
   name: 'LongDay',
   englishName: 'HaGooLongDay',
-  url: 'https://Butaouo.github.io/fursona-website/',
+  url: 'https://longday.tw/',
   person: {
     name: { 'zh-TW': '久天', en: 'LongDay' },
     fullName: { 'zh-TW': '哈古久天', en: 'Lyont HaGoo LongDay' },
