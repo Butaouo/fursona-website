@@ -17,7 +17,10 @@ test('empty published sections contain only visitor copy with no placeholder spa
         await expect(page.locator('.empty-state,.empty-mark,.product-placeholder,.cover-placeholder,.product-card,.map-shell')).toHaveCount(0);
       }
       if (route === 'relationships') {
-        await expect(page.locator('.content-heading>p').last()).toHaveText(language === 'en' ? 'Encounters, connections, and the world we share.' : '相遇、牽絆，以及同一個世界裡的彼此。');
+        const intro = language === 'en' ? 'Encounters, connections, and the world we share.' : '相遇、牽絆，以及同一個世界裡的彼此。';
+        // AnimatedText keeps an accessible label and a separate animated ink layer.
+        await expect(page.locator('.content-heading>p').last().locator('.sr-only')).toHaveText(intro);
+        await expect(page.locator('.content-heading>p').last().locator('.label-ink')).toHaveText(intro);
         await expect(page.locator('main')).not.toContainText('✳');
         const heading = await page.locator('.content-heading').boundingBox();
         const footer = await page.locator('footer').boundingBox();
