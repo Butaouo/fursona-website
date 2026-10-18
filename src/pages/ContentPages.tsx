@@ -9,7 +9,7 @@ import { Gallery } from '../components/Gallery';
 type Props = { language: Language };
 const label = (key: Parameters<typeof copy>[0], language: Language) => <AnimatedText reveal>{copy(key, language)}</AnimatedText>;
 function PageTitle({ title, intro, language }: Props & { title: 'archive' | 'shop' | 'relationships' | 'about'; intro: Parameters<typeof copy>[0] }) {
-  return <header className="content-heading"><p className="eyebrow">LONGDAY / {title.toUpperCase()}</p><h1>{label(title, language)}<span aria-hidden="true">.</span></h1><p>{label(intro, language)}</p></header>;
+  return <header className="content-heading"><p className="eyebrow">LONGDAY / {title === 'about' ? 'CHARACTER' : title.toUpperCase()}</p><h1>{label(title, language)}<span aria-hidden="true">.</span></h1><p>{label(intro, language)}</p></header>;
 }
 function Empty({ title, detail }: { title: string; detail?: string }) { return <Glass className="empty-state"><h2>{title}</h2>{detail && <p>{detail}</p>}</Glass>; }
 function Media({ src, alt, className = '', onClick, retryable = true }: { src: string; alt: string; className?: string; onClick?: () => void; retryable?: boolean }) {
