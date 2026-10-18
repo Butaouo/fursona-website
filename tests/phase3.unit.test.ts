@@ -7,4 +7,5 @@ describe('animation quality preserves mobile motion', () => {
   it('respects data saver without declaring animation disabled', () => expect(effectTier(8, true)).toBe('low'));
   it('ignores startup stalls and too few samples', () => { expect(sustainedSlowFrames(200,180,1500)).toBe(false); expect(sustainedSlowFrames(40,40,9000)).toBe(false); });
   it('requires sustained slow delivery rather than occasional drops', () => { expect(sustainedSlowFrames(180,70,6500)).toBe(false); expect(sustainedSlowFrames(100,70,6500)).toBe(true); });
+  it('detects very slow compositors after a longer observation window', () => { expect(sustainedSlowFrames(30,28,16000)).toBe(true); expect(sustainedSlowFrames(30,5,16000)).toBe(false); });
 });

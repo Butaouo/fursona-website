@@ -27,7 +27,7 @@ test('opening plays once and never traps input or repeats on return',async({page
   await page.reload();await expect(page.locator('#hero-heading')).toBeVisible();
   expect(await page.evaluate(()=>(window as unknown as Record<string,number>).openingSeen)).toBe(0);
 });
-test('normal phones retain three moving lights, scroll depth and touch feedback',async({page})=>{
+test('normal phones retain three moving lights, scroll depth and touch feedback',async({page,hasTouch},info)=>{
   await page.addInitScript(()=>{Object.defineProperty(navigator,'hardwareConcurrency',{get:()=>4});Object.defineProperty(navigator,'deviceMemory',{get:()=>4});});
   await page.goto('./');await expect(page.locator('html')).toHaveAttribute('data-quality','high');
   const lights=page.locator('.ambient-orb');await expect(lights).toHaveCount(3);
@@ -38,11 +38,36 @@ test('normal phones retain three moving lights, scroll depth and touch feedback'
   await page.locator('.social-panel').scrollIntoViewIfNeeded();
   await expect(page.locator('.social-panel')).toHaveAttribute('data-revealed','true');
   await expect.poll(()=>page.locator('.ambient-depth').getAttribute('style')).not.toBe(depth);
-  await page.locator('.social-panel').dispatchEvent('pointerdown',{pointerType:'touch',clientX:100,clientY:200,pointerId:3,bubbles:true});
+  // Inspect the short wave in the same event turn. A separate protocol round trip
+  // can arrive after the 680 ms wave has finished on software-rendered WebKit.
+  const feedback = await page.locator('.social-panel').evaluate(el => {
+    el.dispatchEvent(new PointerEvent('pointerdown',{pointerType:'touch',clientX:100,clientY:200,pointerId:3,bubbles:true}));
+    const wave=document.querySelector('.touch-wave')!;
+    const animations=wave.getAnimations();
+    return { count:animations.length,duration:animations[0]?.effect?.getTiming().duration };
+  });
   await expect(page.locator('.social-panel')).toHaveAttribute('data-pressed','true');
-  expect(await page.locator('.touch-wave').evaluate(el=>el.getAnimations().length)).toBeGreaterThan(0);
+  expect(feedback.count).toBeGreaterThan(0);
+  expect(feedback.duration).toBe(680);
   await page.locator('.social-panel').dispatchEvent('pointerup',{pointerType:'touch',pointerId:3});
   await expect(page.locator('.social-panel')).not.toHaveAttribute('data-pressed','true');
+  if (hasTouch) {
+    await page.evaluate(() => {
+      window.addEventListener('pointerdown',e => {
+        if (e.pointerType === 'touch') queueMicrotask(() => {
+          const wave=document.querySelector('.touch-wave')!;
+          const animations=wave.getAnimations();
+          (window as unknown as Record<string,unknown>).nativeTouchEvidence={count:animations.length,duration:animations[0]?.effect?.getTiming().duration};
+        });
+      },{once:true});
+    });
+    const box=await page.locator('.social-panel').boundingBox();
+    // Tap the card's padding, away from any external social destination.
+    await page.touchscreen.tap(box!.x+8,box!.y+8);
+    const native=await page.evaluate(()=>(window as unknown as Record<string,{count:number;duration:number}>).nativeTouchEvidence);
+    expect(native.count).toBeGreaterThan(0);expect(native.duration).toBe(680);
+  }
+  await info.attach('motion-measurements',{body:JSON.stringify({initialLight:initial,currentLight:await orb.evaluate(el=>getComputedStyle(el).transform),depthBefore:depth,depthAfter:await page.locator('.ambient-depth').getAttribute('style'),touchAnimation:feedback,nativeTouch:hasTouch}),contentType:'application/json'});
 });
 test('low effects retain motion while reduced-motion and pause stop it',async({page})=>{
   await page.addInitScript(()=>Object.defineProperty(navigator,'deviceMemory',{get:()=>1}));
@@ -64,7 +89,8 @@ test('reader text and illustrations reveal in order without changing semantics',
   await figure.scrollIntoViewIfNeeded();await expect(figure).toHaveAttribute('data-revealed','true');
   await expect(figure.locator('img')).toBeVisible();await expect(figure.locator('figcaption')).toHaveText('插畫說明');
   await page.getByRole('button',{name:'放大: 久天插畫',exact:true}).click();await expect(page.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');
-  expect(await page.locator('.reader-body').evaluate(el=>[...el.children].map(n=>n.tagName))).toEqual(['H2','P','P','P','P','P','FIGURE','P']);
+  expect(await page.locator('.reader-body').evaluate(el=>[...el.children].map(n=>n.tagName))).toEqual(['H2','P','P','P','P','P','FIGURE','P','NAV']);
+  await expect(page.locator('.reader-body > nav')).toHaveAttribute('aria-label','章節目錄');
 });
 test('public branding and all displayed image sources remain local and neutral',async({page,baseURL})=>{
   await page.goto('./');await expect(page.locator('#hero-heading')).toBeVisible();
@@ -73,6 +99,6 @@ test('public branding and all displayed image sources remain local and neutral',
   const urls=await page.locator('img').evaluateAll(nodes=>nodes.map(n=>({src:(n as HTMLImageElement).currentSrc||(n as HTMLImageElement).src,alt:n.getAttribute('alt')})));
   for(const item of urls){expect(item.src).toContain(new URL(baseURL!).origin);expect(JSON.stringify(item)).not.toMatch(prohibited);}
   const metadata=await page.locator('head meta, head link').evaluateAll(nodes=>nodes.map(n=>n.outerHTML).join('\n'));expect(metadata).not.toMatch(prohibited);
-  expect(await page.locator('meta[property="og:image"]').getAttribute('content')).toContain('/fursona-website/images/lyont-avatar.webp');
+  expect(await page.locator('meta[property="og:image"]').getAttribute('content')).toBe('https://longday.tw/images/lyont-avatar.webp');
   expect(await page.locator('a[href]').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('href')).join('\n'))).not.toMatch(prohibited);
 });
