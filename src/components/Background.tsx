@@ -16,7 +16,9 @@ export function Background({ enabled, route = '' }: { enabled: boolean; route?: 
       // Ignore boot work; 30 fps power-saving Safari keeps its main animation.
       if (last && time - start > 1500) { samples++; if (time - last > 50) slow++; }
       last = time;
-      if (time - start >= 8000) {
+      // Slow compositors may not produce 80 frames in eight seconds. Keep sampling
+      // long enough to detect that case, rather than returning before adapting.
+      if (time - start >= 8000 && (samples >= 80 || time - start >= 16500)) {
         if (sustainedSlowFrames(samples, slow, time - start - 1500)) root.dataset.quality = 'low';
         return;
       }
