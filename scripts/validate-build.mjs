@@ -31,3 +31,18 @@ console.log(JSON.stringify({ domain: 'longday.tw', canonical: 'PASS', sharingIma
 
 const { auditPublicBuild } = await import('./public-content.mjs');
 console.log(JSON.stringify(await auditPublicBuild()));
+
+// Keep public asset names neutral; required third-party license notices are retained.
+const toolTrace = /chatgpt|openai|dall[·. -]?e|oaiusercontent|sdmnt|blob\.core\.windows/i;
+async function inspectPublic(directory) {
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (toolTrace.test(entry.name)) throw new Error(`Non-brand public filename: ${entry.name}`);
+    if (entry.isDirectory()) await inspectPublic(path);
+    else if (/\.(html|json|svg|txt|xml)$/i.test(entry.name) && !/license|notice/i.test(entry.name)) {
+      if (toolTrace.test(await readFile(path, 'utf8'))) throw new Error(`Unexpected tool branding in ${path}`);
+    }
+  }
+}
+await inspectPublic('dist');
+console.log(JSON.stringify({ brandAudit: 'PASS', policy: 'stable project assets; license notices preserved' }));
