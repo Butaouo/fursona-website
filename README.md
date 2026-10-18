@@ -10,7 +10,7 @@ A bilingual, fursona-centered personal IP site with warm liquid-glass surfaces, 
 
 **Pre-cutover Pages URL:** https://butaouo.github.io/fursona-website/
 
-See **docs/VERIFICATION.md** for the original release evidence and **docs/PHASE3.md** for motion architecture. Current Actions runs and their verification artifacts contain the latest results: 28 unit checks and 110 browser checks across five browser/device projects.
+See **docs/VERIFICATION.md** for the original release evidence and **docs/PHASE3.md** for motion architecture. Current Actions runs and their verification artifacts contain the latest results: 28 unit checks and 115 browser checks across five browser/device projects.
 
 That report records the original release. Phase 2 adds 25 browser checks to the original 50 and has 18 unit checks; use the current Actions run and its verification artifact for the latest results. Google authorization and real-device testing are separate from automated fixture tests.
 
@@ -38,7 +38,7 @@ In **src/config/site.ts**, update `music.track`, `artist`, `album`, `artwork`, `
 
 ## Deployment
 
-The included **.github/workflows/deploy.yml** builds and verifies each main-branch push, runs 110 Chromium/Firefox/WebKit and mobile-emulation checks, audits Lighthouse, then deploys the verified dist artifact through GitHub Pages. Pull requests run checks only. Failure in verification prevents deployment. Google synchronization is opt-in and runs twice per hour after authorization; schedules may be delayed. No third-party deployment service is required. The repository is public and Pages uses GitHub Actions as its build source. Browser tests use a virtual display on Linux; original assertions remain active.
+The included **.github/workflows/deploy.yml** builds and verifies each main-branch push, runs 115 Chromium/Firefox/WebKit and mobile-emulation checks, audits Lighthouse, then deploys the verified dist artifact through GitHub Pages. Pull requests run checks only. Failure in verification prevents deployment. Google synchronization is opt-in and runs twice per hour after authorization; schedules may be delayed. No third-party deployment service is required. The repository is public and Pages uses GitHub Actions as its build source. Browser tests use a virtual display on Linux; original assertions remain active.
 
 Vite base is **/** for the active longday.tw domain. A future custom domain can override the base through `SITE_BASE=/`, with matching canonical/open-graph URLs in `index.html` and `site.url`. Pages use hash routes (`#/archive`, `#/relationships`, `#/shop`, `#/about`), so direct links and refreshes work without server rewrites. Original homepage section anchors still work.
 
@@ -56,3 +56,5 @@ See **docs/DESIGN.md**, **docs/ASSETS.md** and **docs/VERIFICATION.md** for deci
 ## Custom domain migration
 
 Canonical origin: https://longday.tw/. See [docs/DOMAIN.md](docs/DOMAIN.md) for activation, DNS, verification and PR #2 integration. Domain and public-content checks remain active when integrating motion changes. Google synchronization remains opt-in and unchanged.
+
+The homepage keeps the hero, brand introduction, social links and music. Complete character references live only on 設定 / Character at `#/about`; old `#fursona` links still open those references. No image assets were removed. Character page metadata follows the selected language; hash-route social crawlers still receive the shared static entry metadata.
