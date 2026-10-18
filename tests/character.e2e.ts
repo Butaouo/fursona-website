@@ -1,5 +1,25 @@
 import { test, expect } from '@playwright/test';
 
+test('a hash changed during initial subscription cannot leave the homepage behind', async ({ page }) => {
+  await page.addInitScript(() => {
+    const listen = window.addEventListener.bind(window);
+    let changed = false;
+    window.addEventListener = ((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => {
+      if (type === 'hashchange' && !changed) {
+        changed = true;
+        // Model a URL change whose event happened before the first subscriber.
+        history.replaceState(null, '', '#/about');
+      }
+      listen(type, listener, options);
+    }) as typeof window.addEventListener;
+  });
+  await page.goto('./');
+  await expect(page).toHaveURL(/#\/about$/);
+  await expect(page.locator('main h1')).toContainText('設定');
+  await expect(page.getByRole('tab', { name: '毛色設定', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: '設定', exact: true })).toHaveAttribute('aria-current', 'page');
+});
+
 test('home stays focused while Character retains references, translations, metadata and legacy links', async ({ page }, info) => {
   await page.goto('./');
   await expect(page.locator('.hero-image')).toBeVisible();
@@ -14,10 +34,11 @@ test('home stays focused while Character retains references, translations, metad
   await expect(page).toHaveTitle('設定 · LongDay');
   await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /角色設定/);
   await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', '設定 · LongDay');
-  for (const label of ['穿衣設定', '毛色設定', '角色插畫']) await expect(page.getByRole('tab', { name: label, exact: true })).toBeVisible();
-  await expect(page.locator('.character-notes')).toContainText('哈古久天');
-  await expect(page.locator('.character-notes')).toContainText('貓狐');
-  await expect(page.locator('.character-notes')).toContainText('沉穩 · 可愛 · 傲嬌');
+  // Independent reads share one wait phase; no assertion or timeout is removed.
+  await Promise.all([
+    ...['穿衣設定', '毛色設定', '角色插畫'].map(label => expect(page.getByRole('tab', { name: label, exact: true })).toBeVisible()),
+    ...['哈古久天', '貓狐', '沉穩 · 可愛 · 傲嬌'].map(text => expect(page.locator('.character-notes')).toContainText(text)),
+  ]);
   await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
   await expect(page.getByRole('link', { name: 'Character', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('link', { name: 'About', exact: true })).toHaveCount(0);
