@@ -10,7 +10,7 @@ import sharp from 'sharp';
 import { parseDocument, published, rows, safeImageUrl, selectTab, sync } from '../scripts/google-sync.mjs';
 describe('static content and navigation',()=>{
   it('accepts honest empty content and rejects remote media',()=>{expect(readCatalog(emptyCatalog)).toEqual(emptyCatalog);expect(safeMedia('https://drive.google.com/private')).toBe(false);expect(safeMedia('content/media/../secret.png')).toBe(false);expect(safeMedia('content/media/abc.webp')).toBe(true);expect(()=>readCatalog({...emptyCatalog,relationship:{src:'javascript:alert(1)',alt:{'zh-TW':'x'}}})).toThrow();});
-  it('preserves legacy anchors and direct hash subpages',()=>{expect(routeFromHash('#connect')).toBe('');expect(routeFromHash('#/archive/chapter-1')).toBe('archive/chapter-1');expect(routeFromHash('#/shop/')).toBe('shop');});
+  it('preserves legacy anchors and direct hash subpages',()=>{expect(routeFromHash('#connect')).toBe('');expect(routeFromHash('#fursona')).toBe('about');expect(routeFromHash('#/about')).toBe('about');expect(routeFromHash('#/archive/chapter-1')).toBe('archive/chapter-1');expect(routeFromHash('#/shop/')).toBe('shop');});
   it('falls back honestly to original text',()=>{expect(localized({'zh-TW':'原文'},'en')).toBe('原文');});
 });
 describe('Google publication security and document ordering',()=>{

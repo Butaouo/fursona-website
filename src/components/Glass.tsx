@@ -2,7 +2,7 @@ import { type CSSProperties, type PropsWithChildren } from 'react';
 
 /** Light follows the pointer; refraction is confined to decorative surfaces, never text. */
 export function Glass({ children, className = '', style }: PropsWithChildren<{ className?: string; style?: CSSProperties }>) {
-  return <div className={`glass ${className}`} style={style}>
+  return <div className={`glass ${className}`} style={style} onPointerDown={e => { const r=e.currentTarget.getBoundingClientRect(); e.currentTarget.style.setProperty('--press-x', `${e.clientX-r.left}px`); e.currentTarget.style.setProperty('--press-y', `${e.clientY-r.top}px`); e.currentTarget.dataset.pressed='true'; }} onPointerUp={e => { delete e.currentTarget.dataset.pressed; }} onPointerCancel={e => { delete e.currentTarget.dataset.pressed; }} onPointerLeave={e => { delete e.currentTarget.dataset.pressed; }}>
     <div className="glass-optics" aria-hidden="true" /><div className="glass-content">{children}</div>
   </div>;
 }

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { expectThemeColors } from './theme';
 const pageFailures = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page, baseURL }) => {
   const failures: string[] = [];
@@ -22,6 +23,10 @@ test('homepage and optimized assets load without clipping or JavaScript errors',
   const fullImage = await page.locator('.hero-image').boundingBox();
   expect(fullImage!.x).toBeGreaterThanOrEqual(0);
   expect(fullImage!.x + fullImage!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await expect(page.locator('.fursona-section,.character-notes')).toHaveCount(0);
+  await page.screenshot({ path: `reports/${info.project.name}-home-clean.png`, fullPage: true });
+  await page.getByRole('link', { name: '設定', exact: true }).click();
+  await expect(page.locator('main h1')).toContainText('設定');
   await page.getByRole('tab', { name: '角色插畫', exact: true }).click();
   const illustration = page.locator('#panel-artwork img');
   await expect(illustration).toHaveAttribute('src', /lyont-illustration\.webp$/);
@@ -92,6 +97,7 @@ test('music does not autoplay; explicit click loads only the official player', a
   await expect(page.getByRole('link', { name: '在 Apple Music 聆聽', exact: true })).toHaveAttribute('href', 'https://music.apple.com/tw/album/younger/1814208594?i=1814208601');
 });
 test('gallery tabs, enlarged artwork and Escape work', async ({ page }) => {
+  await page.goto('./#/about');
   await page.getByRole('tab', { name: '毛色設定', exact: true }).click();
   await expect(page.getByRole('tabpanel')).toHaveAttribute('id', 'panel-natural');
   await page.getByRole('button', { name: '查看完整圖片', exact: true }).click();
@@ -121,6 +127,7 @@ test('light and dark screens have no serious accessibility violations', async ({
     // A data attribute can update before the browser resolves inherited text styles.
     // Verify the actual visible button label, then audit the fully applied theme.
     await expect(page.locator('.button-primary .label-ink')).toHaveCSS('color', theme === 'dark' ? 'rgb(39, 32, 20)' : 'rgb(255, 250, 240)');
+    await expectThemeColors(page, theme);
     const result = await new AxeBuilder({ page }).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
     expect(result.violations).toEqual([]);
   }

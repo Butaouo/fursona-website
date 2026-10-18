@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { expectThemeColors } from './theme';
 const fixture={version:1,articles:[{id:'test-story',kind:'novel',title:{'zh-TW':'測試篇章',en:'Test chapter'},summary:{'zh-TW':'僅供自動測試',en:'Test fixture only'},date:'2026-01-01',series:'test',chapter:1,cover:'images/lyont-illustration.webp',blocks:[{type:'heading',runs:[{text:'第一節'}]},{type:'paragraph',runs:[{text:'<script>alert(1)</script> 這是粗體文字。',bold:true}]},{type:'image',src:'images/lyont-illustration.webp',width:1280,height:870,alt:'測試插畫',caption:'測試圖片說明'},{type:'paragraph',runs:[{text:'圖片之後的段落。'.repeat(100),italic:true}]}]},{id:'test-story-2',kind:'novel',title:{'zh-TW':'第二章'},summary:{'zh-TW':''},date:'2026-01-02',series:'test',chapter:2,blocks:[{type:'paragraph',runs:[{text:'第二章正文'}]}]}],products:Array.from({length:4},(_,i)=>({id:`fixture-item-${i}`,name:{'zh-TW':`測試商品 ${i+1}`,en:`Fixture item ${i+1}`},summary:{'zh-TW':'簡短商品介紹'},description:{'zh-TW':'完整商品介紹，僅供自動化驗證。'},image:'images/lyont-illustration.webp',status:{'zh-TW':'展示'},order:i})),relationship:{src:'images/lyont-reference-clothed.webp',alt:{'zh-TW':'測試用關係圖'}}};
 const failures = new WeakMap<Page, string[]>();
 test.beforeEach(async({page,baseURL})=>{
@@ -14,17 +15,22 @@ test.afterEach(async ({ page }, info) => {
   expect(failures.get(page), 'new-page console, runtime and local resource errors').toEqual([]);
   if (info.status === 'passed') await info.attach('phase2-page', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
 });
-test('five routes survive refresh, history and language switching',async({page})=>{
-  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
-  const titles:Record<string,string>={archive:'創作',relationships:'關係網',shop:'商品',about:'關於'};
-  for(const route of ['archive','relationships','shop','about']){
+// Each deep-link/refresh is an independent acceptance case. Keep every original
+// assertion and the default deadlines instead of sharing one 30s budget across
+// eight full loads plus history and a language transition on software WebKit.
+for (const [route,title] of Object.entries({archive:'創作',relationships:'關係網',shop:'商品',about:'設定'})) {
+  test(`${route} opens directly and survives refresh without horizontal overflow`,async({page})=>{
     await page.goto(`./#/${route}`);
-    // The previous page remains visible during exit; wait for the target page.
-    await expect(page.locator('main h1')).toContainText(titles[route]);
+    await expect(page.locator('main h1')).toContainText(title);
     await page.reload();
-    await expect(page.locator('main h1')).toContainText(titles[route]);
+    await expect(page.locator('main h1')).toContainText(title);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-  }
+  });
+}
+test('navigation history and language switching preserve the current route',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('./#/about');
+  await expect(page.locator('main h1')).toContainText('設定');
   await page.getByRole('link',{name:'商品',exact:true}).click();
   await expect(page).toHaveURL(/#\/shop$/);
   await expect(page.locator('main h1')).toContainText('商品');
@@ -33,10 +39,10 @@ test('five routes survive refresh, history and language switching',async({page})
   await expect(page).toHaveURL(/#\/shop$/);
   await page.goBack();
   await expect(page).toHaveURL(/#\/about$/);
-  await expect(page.locator('main h1')).toContainText('About');
+  await expect(page.locator('main h1')).toContainText('Character');
   expect(errors).toEqual([]);
 });
 test('reader keeps text and illustrations ordered, supports chapters and safe zoom',async({page})=>{await page.goto('./#/archive/test-story');await expect(page.locator('.reader-body>p').first()).toContainText('<script>alert(1)</script>');expect(await page.locator('.reader-body').evaluate(el=>[...el.children].map(x=>x.tagName).slice(0,4))).toEqual(['H2','P','FIGURE','P']);await page.getByRole('button',{name:'放大: 測試插畫',exact:true}).click();await expect(page.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).not.toBeVisible();await page.getByRole('link',{name:/下一章/}).click();await expect(page).toHaveURL(/test-story-2$/);await expect(page.getByRole('link',{name:/上一章/})).toBeVisible();});
 test('shop expands and closes with keyboard and restores scroll',async({page})=>{await page.goto('./#/shop');await expect(page.locator('.product-card')).toHaveCount(4);await page.locator('.product-card').first().scrollIntoViewIfNeeded();const top=await page.evaluate(()=>scrollY);await page.locator('.product-card').first().click();await expect(page.getByRole('dialog')).toBeVisible();await expect(page.locator('.description-ink')).toContainText('完整商品介紹');await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).not.toBeVisible();expect(Math.abs(await page.evaluate(()=>scrollY)-top)).toBeLessThan(4);await page.emulateMedia({reducedMotion:'reduce'});await page.locator('.product-card').nth(1).click();await expect(page.getByRole('dialog')).toBeVisible();await page.getByRole('button',{name:/返回/}).click();await expect(page.getByRole('dialog')).not.toBeVisible();});
 test('relationship zoom, pan, reset and fullscreen close work',async({page})=>{await page.goto('./#/relationships');await expect(page.locator('.map-stage img')).toBeVisible();await page.getByRole('button',{name:'放大',exact:true}).click();await expect(page.locator('.map-tools output')).toHaveText('125%');await page.locator('.map-stage').focus();await page.keyboard.press('ArrowRight');await expect(page.locator('.map-transform')).toHaveCSS('transform',/30/);await page.getByRole('button',{name:'恢復原始比例',exact:true}).click();await expect(page.locator('.map-tools output')).toHaveText('100%');await page.getByRole('button',{name:'全螢幕檢視',exact:true}).click();await expect(page.getByRole('dialog')).toBeVisible();await page.getByRole('button',{name:'關閉',exact:true}).click();await expect(page.getByRole('dialog')).not.toBeVisible();});
-test('new pages are accessible, responsive and preserve reduced motion in both themes',async({page})=>{test.setTimeout(90000);await page.emulateMedia({reducedMotion:'reduce'});for(const route of ['archive','relationships','shop']){await page.goto(`./#/${route}`);await expect(page.locator('main h1')).toBeVisible();for(const theme of ['light','dark']){await page.getByTestId(`theme-${theme}`).click();const results=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(results.violations).toEqual([]);}expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await expect(page.locator('.orb-one')).toHaveCSS('animation-name','none');}});
+test('new pages are accessible, responsive and preserve reduced motion in both themes',async({page})=>{test.setTimeout(90000);await page.emulateMedia({reducedMotion:'reduce'});for(const route of ['archive','relationships','shop']){await page.goto(`./#/${route}`);await expect(page.locator('main h1')).toContainText(({archive:'創作',relationships:'關係網',shop:'商品'} as Record<string,string>)[route]);await expect(page.locator('main h1')).toBeVisible();for(const theme of ['light','dark']){await page.getByTestId(`theme-${theme}`).click();await expectThemeColors(page,theme);const results=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(results.violations).toEqual([]);}expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await expect(page.locator('.orb-one')).toHaveCSS('animation-name','none');}});

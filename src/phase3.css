@@ -1,0 +1,81 @@
+/* LongDay light stage: three independently composed fields, a horizon and suspended dust.
+   All continuous motion uses transform/opacity; no animated SVG or viewport blur. */
+.ambient{background:radial-gradient(ellipse at 85% 0,rgba(239,180,61,.13),transparent 62%)}
+.ambient-depth{position:absolute;inset:-6% -5% -14%;transition:transform .18s linear}
+.ambient .ambient-orb{display:block;filter:none!important;opacity:1;border-radius:0;will-change:transform;transition:opacity .6s;right:auto;left:auto;top:auto;width:95%;height:92%}
+.ambient .orb-one{left:22%;top:-23%;background:radial-gradient(ellipse at 48% 45%,rgba(255,195,58,.69) 0%,rgba(244,166,39,.36) 24%,rgba(249,198,98,.12) 45%,transparent 68%);animation:solar-current 18s cubic-bezier(.45,0,.55,1) infinite alternate}
+.ambient .orb-two{left:-39%;top:16%;background:radial-gradient(ellipse at 54% 48%,rgba(216,123,61,.42),rgba(238,175,100,.17) 35%,transparent 64%);animation:amber-current 23s ease-in-out infinite alternate;animation-delay:-9s}
+.ambient .orb-three{left:34%;top:43%;width:80%;height:76%;background:radial-gradient(ellipse,rgba(67,151,163,.22),rgba(124,179,177,.09) 35%,transparent 65%);animation:tidal-current 21s ease-in-out infinite alternate;animation-delay:-14s}
+.ambient-ribbon{position:absolute;left:-28%;top:27%;width:155%;height:48%;background:radial-gradient(ellipse at center,transparent 41%,rgba(221,153,41,.19) 46%,rgba(255,230,159,.24) 49%,transparent 56%);transform:rotate(-32deg);animation:horizon-current 26s ease-in-out infinite alternate;pointer-events:none}
+.ambient-sparks{position:absolute;inset:0;background:radial-gradient(circle at 12% 21%,#d7a349 0 1.3px,transparent 2px),radial-gradient(circle at 78% 13%,#e8b853 0 1.5px,transparent 2px),radial-gradient(circle at 86% 65%,#d49b35 0 1px,transparent 2px),radial-gradient(circle at 24% 75%,#b78d45 0 1px,transparent 2px),radial-gradient(circle at 65% 44%,#e4bb65 0 1.4px,transparent 2px);opacity:.55;animation:dust-current 14s ease-in-out infinite alternate}
+:root[data-theme=dark] .ambient{background:radial-gradient(ellipse at 10% 20%,#47331e88,transparent 60%)}
+:root[data-theme=dark] .ambient .orb-one{opacity:.56}
+:root[data-theme=dark] .ambient .orb-two{opacity:.48}
+:root[data-theme=dark] .ambient .orb-three{opacity:.54}
+:root[data-theme=dark] .ambient-ribbon{opacity:.7}
+.ambient[data-scene=archive] .orb-one{left:-25%;top:-35%}.ambient[data-scene=archive] .orb-two{left:12%;top:42%}
+.ambient[data-scene=relationships] .orb-three{left:-28%;top:12%}.ambient[data-scene=relationships] .orb-one{left:40%;top:5%}
+.ambient[data-scene=shop] .orb-one{left:12%;top:-36%}.ambient[data-scene=shop] .ambient-ribbon{top:10%;transform:rotate(22deg)}
+.ambient[data-scene=about] .orb-two{left:-10%;top:-20%}
+@keyframes solar-current{0%{transform:translate3d(-7%,3%,0) rotate(-12deg) scale(1)}45%{transform:translate3d(3%,11%,0) rotate(4deg) scale(1.09)}100%{transform:translate3d(-16%,17%,0) rotate(16deg) scale(.94)}}
+@keyframes amber-current{0%{transform:translate3d(0,-5%,0) scale(.94)}55%{transform:translate3d(14%,3%,0) scale(1.1)}100%{transform:translate3d(5%,18%,0) scale(1.02)}}
+@keyframes tidal-current{from{transform:translate3d(-4%,6%,0) rotate(12deg)}to{transform:translate3d(-28%,-15%,0) rotate(-9deg) scale(1.12)}}
+@keyframes horizon-current{from{transform:translate3d(0,-6%,0) rotate(-32deg) scale(1)}to{transform:translate3d(8%,15%,0) rotate(-19deg) scale(1.07)}}
+@keyframes dust-current{from{transform:translate3d(0,12px,0);opacity:.35}to{transform:translate3d(12px,-22px,0);opacity:.7}}
+/* Reflections follow the same light-stage rhythm; text stays on a separate layer. */
+.glass-optics:before{inset:-50% -30%;background:linear-gradient(var(--light-angle,125deg),transparent 28%,rgba(255,238,182,.24) 45%,rgba(255,255,255,.36) 49%,transparent 62%)!important;animation:lens-current 18s ease-in-out infinite alternate;transform:translate3d(-14%,0,0);filter:none!important}
+.glass:before{background:linear-gradient(var(--light-angle,128deg),rgba(255,255,255,.94),rgba(255,240,194,.09) 32%,rgba(229,173,60,.65) 70%,rgba(255,255,255,.24))}
+@keyframes lens-current{from{transform:translate3d(-18%,-4%,0) rotate(-5deg);opacity:.38}to{transform:translate3d(19%,7%,0) rotate(7deg);opacity:.85}}
+.glass:after{background:radial-gradient(circle 150px at var(--press-x,50%) var(--press-y,50%),rgba(255,226,155,.36),transparent 75%);opacity:0}
+.glass[data-pressed=true]:after{opacity:1}
+.touch-wave{position:fixed;z-index:7;pointer-events:none;width:180px;height:180px;border:1px solid rgba(238,183,70,.6);border-radius:50%;background:radial-gradient(circle,transparent 30%,rgba(239,183,71,.17) 50%,transparent 72%);opacity:0}
+/* One 1.15s opening. It never captures input or defers the hero image request. */
+.opening{position:fixed;inset:0;z-index:60;pointer-events:none;overflow:hidden}
+.opening-shutter{position:absolute;left:0;width:100%;height:50.2%;background:#201d16;animation-duration:.82s;animation-delay:.1s;animation-fill-mode:both;animation-timing-function:cubic-bezier(.76,0,.24,1)}
+.shutter-top{top:0;animation-name:shutter-up}.shutter-bottom{bottom:0;animation-name:shutter-down}
+.opening-horizon{position:absolute;top:50%;left:0;width:100%;height:2px;background:linear-gradient(90deg,transparent,#eabc59,#fff5ce,#eabc59,transparent);transform-origin:center;animation:opening-line .9s both}
+.opening-signature{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff0cd;animation:opening-sign .85s both;font-size:clamp(44px,10vw,96px);font-weight:700;letter-spacing:-.06em}
+.opening-signature small{font-size:10px;letter-spacing:.3em;margin-top:10px}.opening-dot{color:#e9b849}
+@keyframes shutter-up{0%,15%{transform:translateY(0)}100%{transform:translateY(-102%)}}
+@keyframes shutter-down{0%,15%{transform:translateY(0)}100%{transform:translateY(102%)}}
+@keyframes opening-line{0%{transform:scaleX(0);opacity:0}30%{transform:scaleX(.7);opacity:1}100%{transform:scaleX(1);opacity:0}}
+@keyframes opening-sign{0%{transform:translateY(8px);opacity:0}22%,45%{transform:translateY(0);opacity:1}100%{transform:translateY(-22px);opacity:0}}
+/* Pages and individual reader layers move on separate timelines. */
+.route-scene{position:relative;transform-origin:50% 18%}
+.route-light{position:fixed;inset:0;z-index:6;pointer-events:none;background:linear-gradient(110deg,transparent 20%,rgba(246,190,72,.13) 48%,transparent 72%);animation:route-sweep .7s cubic-bezier(.22,1,.36,1) both}
+@keyframes route-sweep{from{transform:translateX(-70%);opacity:0}30%{opacity:1}to{transform:translateX(70%);opacity:0}}
+.scene-reveal{opacity:1}
+.scene-reveal:not([data-revealed=true]){opacity:0;transform:translate3d(0,34px,0)}
+.scene-reveal[data-revealed=true]{animation:scene-arrive .75s cubic-bezier(.16,1,.3,1) both}
+.reader-body>figure.scene-reveal[data-revealed=true]{animation-name:illustration-arrive;animation-duration:.95s}
+.reader-body>p.scene-reveal[data-revealed=true]{animation-duration:.65s}
+@keyframes scene-arrive{from{opacity:0;transform:translate3d(0,34px,0) scale(.985)}to{opacity:1;transform:translate3d(0,0,0) scale(1)}}
+@keyframes illustration-arrive{from{opacity:.25;transform:translate3d(0,42px,0) scale(.96);clip-path:inset(7% 3% round 18px)}to{opacity:1;transform:translate3d(0,0,0) scale(1);clip-path:inset(0 round 12px)}}
+.hero-copy>.eyebrow,.hero-fullname{animation:hero-line .75s cubic-bezier(.16,1,.3,1) both}
+.hero-fullname{animation-delay:.15s}
+@keyframes hero-line{from{opacity:.2;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.art-halo{animation:halo-orbit 22s ease-in-out infinite alternate}
+@keyframes halo-orbit{from{transform:rotate(-22deg) scale(.96)}to{transform:rotate(8deg) scale(1.035)}}
+.product-card:active,.archive-card:active{box-shadow:0 0 0 2px var(--accent),0 15px 35px var(--shadow)}
+:root[data-quality=low] .ambient-sparks{display:none}
+:root[data-quality=low] .glass,:root[data-quality=low] .glass-button{-webkit-backdrop-filter:none;backdrop-filter:none}
+:root[data-quality=low] .art-float{animation:float 9s ease-in-out infinite}
+:root[data-quality=low] .ambient .ambient-orb{filter:none;animation-duration:26s}
+@media(max-width:760px){
+ .ambient .orb-one{width:150%;height:78%;left:-10%;top:-7%}
+ .ambient .orb-two{width:145%;height:87%;left:-65%;top:28%}
+ .ambient .orb-three{display:block;width:125%;height:70%;left:24%;top:35%}
+ .ambient-ribbon{left:-65%;width:225%;height:40%;top:31%}
+ .ambient[data-scene=shop] .orb-one{left:-18%;top:-10%}
+ .ambient[data-scene=archive] .orb-one{left:-55%;top:-18%}
+ .ambient[data-scene=relationships] .orb-three{left:-50%;top:9%}
+ .glass{-webkit-backdrop-filter:blur(8px) saturate(125%);backdrop-filter:blur(8px) saturate(125%)}
+ .art-float{animation-duration:6s}.art-parallax{transform:translate3d(0,0,0)}
+ .glass-optics:before{animation-duration:14s}
+}
+:root[data-motion=still] .scene-reveal{opacity:1!important;transform:none!important;clip-path:none!important}
+:root[data-motion=still] .opening,:root[data-motion=still] .route-light,:root[data-motion=still] .touch-wave{display:none}
+:root[data-motion=still] .ambient-depth{transform:none!important}
+:root[data-motion=still] .ambient .ambient-orb,:root[data-motion=still] .ambient-ribbon,:root[data-motion=still] .ambient-sparks,:root[data-motion=still] .glass-optics:before{animation:none!important}
+:root[data-visibility=hidden] *::before,:root[data-visibility=hidden] *::after{animation-play-state:paused!important}
+@media(prefers-reduced-motion:reduce){.scene-reveal{opacity:1!important;transform:none!important;clip-path:none!important}.opening,.route-light,.touch-wave{display:none}.ambient-depth{transform:none!important}}

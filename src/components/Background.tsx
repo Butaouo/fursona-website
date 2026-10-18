@@ -1,80 +1,65 @@
 import { useEffect, useRef } from 'react';
+import { effectTier, sustainedSlowFrames } from '../motionPolicy';
 type DeviceNavigator = Navigator & { deviceMemory?: number; connection?: { saveData?: boolean } };
-export function Background({ enabled }: { enabled: boolean }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+/** Composited light fields, not a continuously repainted viewport canvas. */
+export function Background({ enabled, route = '' }: { enabled: boolean; route?: string }) {
+  const depth = useRef<HTMLDivElement>(null);
+  const pulse = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d', { alpha: true });
+    const root = document.documentElement;
     const nav = navigator as DeviceNavigator;
-    if (!canvas || !ctx || !enabled) return;
-    const low = (nav.deviceMemory ?? 8) <= 4 || (nav.hardwareConcurrency ?? 8) <= 4 || nav.connection?.saveData;
-    document.documentElement.dataset.quality = low ? 'low' : 'high';
-    if (nav.connection?.saveData) return;
-    let width = 0, height = 0, raf = 0, last = 0, samples = 0, slow = 0, frames = 0, visible = !document.hidden;
-    let watchdog: ReturnType<typeof setTimeout>;
-    const checkRendering = () => {
-      clearTimeout(watchdog);
-      const startFrames = frames;
-      // A frame-count-only check never completes when the compositor stalls.
-      watchdog = setTimeout(() => {
-        if (visible && frames - startFrames < 24) {
-          particles.length = Math.min(8, particles.length);
-          document.documentElement.dataset.quality = 'minimal';
-          cancelAnimationFrame(raf);
-          ctx.clearRect(0, 0, width, height);
-        }
-      }, 1500);
-    };
-    const particles = Array.from({ length: low ? 8 : matchMedia('(pointer: coarse)').matches ? 12 : 28 }, (_, i) => ({
-      x: (i * 0.61803398875) % 1, y: (i * 0.38196601125 + 0.15) % 1, r: 0.7 + (i % 3) * 0.45, speed: 0.006 + (i % 5) * 0.0015,
-    }));
-    const resize = () => {
-      width = innerWidth; height = innerHeight;
-      const dpr = Math.min(devicePixelRatio || 1, low ? 1 : 1.5);
-      canvas.width = width * dpr; canvas.height = height * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    };
-    const draw = (time: number) => {
-      if (!visible || document.documentElement.dataset.quality === 'minimal') return;
-      frames++;
-      const delta = last ? Math.min((time - last) / 1000, 0.05) : 0;
-      if (last && ++samples < 180 && time - last > 28) slow++;
-      if (samples === 180 && slow > 65 && document.documentElement.dataset.quality !== 'minimal') { particles.length = Math.min(8, particles.length); document.documentElement.dataset.quality = 'low'; }
+    root.dataset.quality = effectTier(nav.deviceMemory, !!nav.connection?.saveData);
+    let frame = 0, start = 0, last = 0, samples = 0, slow = 0;
+    const sample = (time: number) => {
+      if (document.hidden || !enabled) return;
+      if (!start) start = time;
+      // Ignore boot work; 30 fps power-saving Safari keeps its main animation.
+      if (last && time - start > 1500) { samples++; if (time - last > 50) slow++; }
       last = time;
-      ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = document.documentElement.dataset.theme === 'dark' ? 'rgba(244,187,78,0.40)' : 'rgba(159,105,29,0.32)';
-      for (const p of particles) {
-        p.y -= p.speed * delta; if (p.y < -0.02) p.y = 1.02;
-        const sway = Math.sin(time * 0.0002 + p.x * 6) * 13;
-        ctx.beginPath(); ctx.arc(p.x * width + sway, p.y * height, p.r, 0, Math.PI * 2); ctx.fill();
+      // Slow compositors may not produce 80 frames in eight seconds. Keep sampling
+      // long enough to detect that case, rather than returning before adapting.
+      if (time - start >= 8000 && (samples >= 80 || time - start >= 16500)) {
+        if (sustainedSlowFrames(samples, slow, time - start - 1500)) root.dataset.quality = 'low';
+        return;
       }
-      raf = requestAnimationFrame(draw);
+      frame = requestAnimationFrame(sample);
     };
-    const onVisibility = () => {
-      visible = !document.hidden; cancelAnimationFrame(raf); last = 0;
-      document.documentElement.dataset.visibility = visible ? 'visible' : 'hidden';
-      if (visible) { raf = requestAnimationFrame(draw); checkRendering(); }
-      else clearTimeout(watchdog);
+    const visibility = () => {
+      root.dataset.visibility = document.hidden ? 'hidden' : 'visible';
+      cancelAnimationFrame(frame);
+      if (!document.hidden && enabled) { start = last = samples = slow = 0; frame = requestAnimationFrame(sample); }
     };
-    resize(); raf = requestAnimationFrame(draw); checkRendering();
-    addEventListener('resize', resize); document.addEventListener('visibilitychange', onVisibility);
-    return () => { clearTimeout(watchdog); cancelAnimationFrame(raf); ctx.clearRect(0, 0, width, height); removeEventListener('resize', resize); document.removeEventListener('visibilitychange', onVisibility); };
+    visibility(); document.addEventListener('visibilitychange', visibility);
+    return () => { cancelAnimationFrame(frame); document.removeEventListener('visibilitychange', visibility); };
   }, [enabled]);
   useEffect(() => {
-    if (!enabled || !matchMedia('(pointer: fine)').matches) return;
-    let raf = 0;
-    const move = (e: MouseEvent) => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        document.documentElement.style.setProperty('--pointer-x', `${(e.clientX / innerWidth - 0.5) * 18}px`);
-        document.documentElement.style.setProperty('--pointer-y', `${(e.clientY / innerHeight - 0.5) * 12}px`);
-        document.documentElement.style.setProperty('--light-x', `${e.clientX / innerWidth * 100}%`);
-        document.documentElement.style.setProperty('--light-y', `${e.clientY / innerHeight * 100}%`);
-        document.documentElement.style.setProperty('--light-angle', `${115 + e.clientX / innerWidth * 30}deg`);
-      });
+    if (!enabled) { depth.current?.style.removeProperty('transform'); return; }
+    let frame = 0, x = 0, y = 0;
+    const update = () => {
+      frame = 0;
+      const progress = Math.min(1, scrollY / Math.max(innerHeight, document.documentElement.scrollHeight - innerHeight));
+      if (depth.current) depth.current.style.transform = `translate3d(${x}px,${y - progress * 85}px,0)`;
     };
-    addEventListener('pointermove', move, { passive: true });
-    return () => { removeEventListener('pointermove', move); cancelAnimationFrame(raf); document.documentElement.style.setProperty('--pointer-x', '0px'); document.documentElement.style.setProperty('--pointer-y', '0px'); };
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
+    const move = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse') return;
+      x = (e.clientX / innerWidth - .5) * 26; y = (e.clientY / innerHeight - .5) * 18;
+      document.documentElement.style.setProperty('--light-angle', `${110 + e.clientX / innerWidth * 45}deg`);
+      document.documentElement.style.setProperty('--pointer-x', `${x * .5}px`);
+      document.documentElement.style.setProperty('--pointer-y', `${y * .5}px`);
+      schedule();
+    };
+    const touch = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse' || !pulse.current) return;
+      const node = pulse.current;
+      node.style.left = `${e.clientX}px`; node.style.top = `${e.clientY}px`;
+      node.getAnimations().forEach(a => a.cancel());
+      node.animate([{ transform: 'translate(-50%,-50%) scale(.15)', opacity: .65 }, { transform: 'translate(-50%,-50%) scale(1.5)', opacity: 0 }], { duration: 680, easing: 'cubic-bezier(.16,1,.3,1)' });
+    };
+    schedule(); addEventListener('scroll', schedule, { passive: true }); addEventListener('resize', schedule);
+    addEventListener('pointermove', move, { passive: true }); addEventListener('pointerdown', touch, { passive: true });
+    const pulseNode = pulse.current;
+    return () => { cancelAnimationFrame(frame); removeEventListener('scroll', schedule); removeEventListener('resize', schedule); removeEventListener('pointermove', move); removeEventListener('pointerdown', touch); pulseNode?.getAnimations().forEach(a => a.cancel()); };
   }, [enabled]);
-  return <div className="ambient" aria-hidden="true"><div className="ambient-orb orb-one" /><div className="ambient-orb orb-two" /><div className="ambient-orb orb-three" /><div className="ambient-grain" /><canvas ref={canvasRef} /></div>;
+  return <><div className="ambient" data-scene={route.split('/')[0] || 'home'} aria-hidden="true"><div ref={depth} className="ambient-depth"><div className="ambient-orb orb-one" /><div className="ambient-orb orb-two" /><div className="ambient-orb orb-three" /><div className="ambient-ribbon" /><div className="ambient-sparks" /></div></div><div ref={pulse} className="touch-wave" aria-hidden="true" /></>;
 }
