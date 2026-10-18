@@ -58,7 +58,7 @@
 @keyframes halo-orbit{from{transform:rotate(-22deg) scale(.96)}to{transform:rotate(8deg) scale(1.035)}}
 .product-card:active,.archive-card:active{box-shadow:0 0 0 2px var(--accent),0 15px 35px var(--shadow)}
 :root[data-quality=low] .ambient-sparks{display:none}
-:root[data-quality=low] .glass,:root[data-quality=low] .glass-button{-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+:root[data-quality=low] .glass,:root[data-quality=low] .glass-button{-webkit-backdrop-filter:none;backdrop-filter:none}
 :root[data-quality=low] .art-float{animation:float 9s ease-in-out infinite}
 :root[data-quality=low] .ambient .ambient-orb{filter:none;animation-duration:26s}
 @media(max-width:760px){

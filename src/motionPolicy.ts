@@ -4,5 +4,6 @@ export function effectTier(memory?: number, saveData = false): EffectTier {
   return saveData || (memory !== undefined && memory <= 2) ? 'low' : 'high';
 }
 export function sustainedSlowFrames(samples: number, slow: number, elapsed: number) {
-  return elapsed >= 6000 && samples >= 80 && slow / samples > .6;
+  const enoughSamples = samples >= 80 || (elapsed >= 15000 && samples >= 20);
+  return elapsed >= 6000 && enoughSamples && slow / samples > .6;
 }
