@@ -16,7 +16,7 @@ test.afterEach(async ({ page }, info) => {
 });
 test('five routes survive refresh, history and language switching',async({page})=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
-  const titles:Record<string,string>={archive:'創作',relationships:'關係網',shop:'商品',about:'關於'};
+  const titles:Record<string,string>={archive:'創作',relationships:'關係網',shop:'商品',about:'設定'};
   for(const route of ['archive','relationships','shop','about']){
     await page.goto(`./#/${route}`);
     // The previous page remains visible during exit; wait for the target page.
@@ -33,7 +33,7 @@ test('five routes survive refresh, history and language switching',async({page})
   await expect(page).toHaveURL(/#\/shop$/);
   await page.goBack();
   await expect(page).toHaveURL(/#\/about$/);
-  await expect(page.locator('main h1')).toContainText('About');
+  await expect(page.locator('main h1')).toContainText('Character');
   expect(errors).toEqual([]);
 });
 test('reader keeps text and illustrations ordered, supports chapters and safe zoom',async({page})=>{await page.goto('./#/archive/test-story');await expect(page.locator('.reader-body>p').first()).toContainText('<script>alert(1)</script>');expect(await page.locator('.reader-body').evaluate(el=>[...el.children].map(x=>x.tagName).slice(0,4))).toEqual(['H2','P','FIGURE','P']);await page.getByRole('button',{name:'放大: 測試插畫',exact:true}).click();await expect(page.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).not.toBeVisible();await page.getByRole('link',{name:/下一章/}).click();await expect(page).toHaveURL(/test-story-2$/);await expect(page.getByRole('link',{name:/上一章/})).toBeVisible();});
