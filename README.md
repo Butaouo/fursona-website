@@ -6,7 +6,9 @@ A bilingual, fursona-centered personal IP site with warm liquid-glass surfaces, 
 
 **Repository:** https://github.com/Butaouo/fursona-website
 
-**GitHub Pages:** https://butaouo.github.io/fursona-website/
+**Target custom domain:** https://longday.tw/
+
+**Pre-cutover Pages URL:** https://butaouo.github.io/fursona-website/
 
 See **docs/VERIFICATION.md** for actual deployment evidence, repair details, test counts, Lighthouse measurements, and testing limits.
 
@@ -36,9 +38,9 @@ In **src/config/site.ts**, update `music.track`, `artist`, `album`, `artwork`, `
 
 ## Deployment
 
-The included **.github/workflows/deploy.yml** builds and verifies each main-branch push, runs 100 Chromium/Firefox/WebKit and mobile-emulation checks, audits Lighthouse, then deploys the verified dist artifact through GitHub Pages. Pull requests run checks only. Failure in verification prevents deployment. Google synchronization is opt-in and runs twice per hour after authorization; schedules may be delayed. No third-party deployment service is required. The repository is public and Pages uses GitHub Actions as its build source. Browser tests use a virtual display on Linux; original assertions remain active.
+The included **.github/workflows/deploy.yml** builds and verifies each main-branch push, runs 80 Chromium/Firefox/WebKit and mobile-emulation checks, audits Lighthouse, then deploys the verified dist artifact through GitHub Pages. Pull requests run checks only. Failure in verification prevents deployment. Google synchronization is opt-in and runs twice per hour after authorization; schedules may be delayed. No third-party deployment service is required. The repository is public and Pages uses GitHub Actions as its build source. Browser tests use a virtual display on Linux; original assertions remain active.
 
-Vite base is **/fursona-website/**. A future custom domain can override the base through `SITE_BASE=/`, with matching canonical/open-graph URLs in `index.html` and `site.url`. Pages use hash routes (`#/archive`, `#/relationships`, `#/shop`, `#/about`), so direct links and refreshes work without server rewrites. Original homepage section anchors still work.
+Vite base is **/** for the prepared longday.tw migration. A future custom domain can override the base through `SITE_BASE=/`, with matching canonical/open-graph URLs in `index.html` and `site.url`. Pages use hash routes (`#/archive`, `#/relationships`, `#/shop`, `#/about`), so direct links and refreshes work without server rewrites. Original homepage section anchors still work.
 
 ## Architecture
 
@@ -52,3 +54,7 @@ Vite base is **/fursona-website/**. A future custom domain can override the base
 See **docs/DESIGN.md**, **docs/ASSETS.md** and **docs/VERIFICATION.md** for decisions, provenance and testing limits.
 
 Phase 3 motion architecture and testing scope: [docs/PHASE3.md](docs/PHASE3.md). Google synchronization remains opt-in and unchanged.
+
+## Custom domain migration
+
+Target canonical origin: https://longday.tw/. See [docs/DOMAIN.md](docs/DOMAIN.md) for activation, DNS, verification and PR #2 integration. Do not merge the migration before DNS access and the cutover are ready.

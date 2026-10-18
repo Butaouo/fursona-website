@@ -4,8 +4,8 @@ export default defineConfig({
   // One worker avoids competing software compositors on the shared CI runner.
   retries: process.env.CI ? 1 : 0, workers: process.env.CI ? 1 : undefined,
   reporter: [['list'], ['html', { open: 'never' }], ['json', { outputFile: 'reports/e2e.json' }]],
-  use: { baseURL: process.env.TEST_URL || 'http://127.0.0.1:4173/fursona-website/', locale: 'zh-TW', colorScheme: 'light', trace: 'retain-on-failure', screenshot: 'only-on-failure' },
-  webServer: process.env.TEST_URL ? undefined : { command: 'npm run preview', url: 'http://127.0.0.1:4173/fursona-website/', reuseExistingServer: !process.env.CI },
+  use: { baseURL: process.env.TEST_URL || 'http://127.0.0.1:4173/', locale: 'zh-TW', colorScheme: 'light', trace: 'retain-on-failure', screenshot: 'only-on-failure' },
+  webServer: process.env.TEST_URL ? undefined : { command: 'npm run preview', url: 'http://127.0.0.1:4173/', reuseExistingServer: !process.env.CI },
   projects: [
     { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 1000 } } },
     { name: 'desktop-firefox', use: { ...devices['Desktop Firefox'] } },
