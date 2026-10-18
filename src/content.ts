@@ -8,7 +8,8 @@ export type Catalog = { version: 1; articles: Article[]; products: Product[]; re
 export const localized = (copy: Copy, language: Language) => copy[language] || copy['zh-TW'];
 export const emptyCatalog: Catalog = { version: 1, articles: [], products: [], relationship: null };
 export const words = {
-  home: ['首頁', 'Home'], archive: ['創作', 'Archive'], relationships: ['關係網', 'Relationships'], shop: ['商品', 'Shop'], about: ['關於', 'About'],
+  home: ['首頁', 'Home'], archive: ['創作', 'Archive'], relationships: ['關係網', 'Relationships'], shop: ['商品', 'Shop'], about: ['設定', 'Character'],
+  characterDescription: ['久天的角色設定、穿衣與毛色參考、角色插畫，以及物種與性格資料。', 'LongDay’s character references, outfit, fur markings, illustrations, species and personality.'],
   archiveIntro: ['故事在字裡行間，也在每一幅畫之中。', 'Stories live between the lines — and inside every frame.'],
   relationshipsIntro: ['相遇、牽絆，以及同一個世界裡的彼此。', 'Encounters, connections, and the world we share.'],
   shopIntro: ['把喜歡的片刻，留在日常裡。', 'A little of this world, brought into everyday life.'],
