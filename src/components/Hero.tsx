@@ -15,7 +15,7 @@ export function Hero({ language, animated }: { language: Language; animated: boo
       <p className="hero-fullname">{site.person.fullName.en}</p>
       <p className="hero-intro"><AnimatedText>{site.person.intro[language]}</AnimatedText></p>
       <p className="hero-tagline"><AnimatedText>{site.person.tagline[language]}</AnimatedText></p>
-      <div className="hero-actions"><a href="#connect" className="button button-primary"><AnimatedText>{t('sayHello')}</AnimatedText><Icon name="arrow" /></a><a href="#fursona" className="button button-secondary"><AnimatedText>{t('discover')}</AnimatedText><Icon name="down" /></a></div>
+      <div className="hero-actions"><a href="#connect" className="button button-primary"><AnimatedText>{t('sayHello')}</AnimatedText><Icon name="arrow" /></a><a href="#/about" className="button button-secondary"><AnimatedText>{t('discover')}</AnimatedText><Icon name="arrow" /></a></div>
       <Glass className="identity-card"><img src={asset(site.images.avatar)} alt={t('avatarAlt')} width="58" height="58" /><div><span className="identity-label">{t('identity')}</span><div className="traits">{site.person.traits[language].map(trait => <span key={trait}>{trait}</span>)}</div></div><Icon name="spark" /></Glass>
       <a className="scroll-hint" href="#connect"><span className="scroll-line" />{t('scroll')}<Icon name="down" /></a>
     </div>
