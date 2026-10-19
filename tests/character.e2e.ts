@@ -20,7 +20,7 @@ test('a hash changed during initial subscription cannot leave the homepage behin
   await expect(page.getByRole('link', { name: '設定', exact: true })).toHaveAttribute('aria-current', 'page');
 });
 
-test('home stays focused while Character retains references, translations, metadata and legacy links', async ({ page }, info) => {
+test('home stays focused while Character retains references, translations and metadata', async ({ page }) => {
   await page.goto('./');
   await expect(page.locator('.hero-image')).toBeVisible();
   await expect(page.locator('.social-link')).toHaveCount(11);
@@ -48,6 +48,15 @@ test('home stays focused while Character retains references, translations, metad
   await page.reload();
   await expect(page.locator('main h1')).toContainText('Character');
   await expect(page).toHaveURL(/#\/about$/);
+});
+
+test('legacy Character links and returning home preserve the focused homepage', async ({ page }, info) => {
+  // Preserve the previous scenario's English, already-seen session before its
+  // legacy-link portion. All original assertions and per-test deadlines remain.
+  await page.addInitScript(() => {
+    localStorage.setItem('longday:language', 'en');
+    sessionStorage.setItem('longday:opening', 'seen');
+  });
   await page.goto('./#fursona');
   await expect(page.locator('main h1')).toContainText('Character');
   await expect(page.locator('.fursona-section')).toHaveCount(1);
