@@ -71,7 +71,15 @@ test('hidden startup and a hidden interval cannot spend the visible presentation
   await visibility('visible'); await started(page);
   await visibility('hidden');
   await expect(page.getByTestId('opening')).toHaveAttribute('data-visible', 'false');
-  const before = await page.locator('.shutter-bottom').evaluate(node => Number(node.getAnimations()[0].currentTime));
+  // CSS pause is pending until the animation's ready promise settles. Reading
+  // currentTime before that can compare a pending sample with its held time
+  // (Firefox exposed a 135ms difference although the hidden interval froze).
+  const paused = await page.locator('.shutter-bottom').evaluate(async node => {
+    const animation = node.getAnimations()[0]; await animation.ready;
+    return { state: animation.playState, time: Number(animation.currentTime) };
+  });
+  expect(paused.state).toBe('paused');
+  const before = paused.time;
   await page.waitForTimeout(1400);
   const after = await page.locator('.shutter-bottom').evaluate(node => Number(node.getAnimations()[0].currentTime));
   expect(Math.abs(after - before)).toBeLessThan(100);
