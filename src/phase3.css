@@ -30,10 +30,10 @@
 .glass[data-pressed=true]:after{opacity:1}
 .touch-wave{position:fixed;z-index:7;pointer-events:none;width:180px;height:180px;border:1px solid rgba(238,183,70,.6);border-radius:50%;background:radial-gradient(circle,transparent 30%,rgba(239,183,71,.17) 50%,transparent 72%);opacity:0}
 /* Static preparation first. Only data-phase=playing creates a 4.6s timeline. */
-.opening{position:fixed;inset:0;z-index:60;pointer-events:none;overflow:hidden}
-.opening-shutter{position:absolute;left:0;width:100%;height:50.2%;background:#201d16}
+.opening{position:fixed;inset:0;z-index:60;pointer-events:none;overflow:hidden;contain:layout paint;isolation:isolate}
+.opening-shutter{position:absolute;left:0;width:100%;height:50.2%;background:#201d16;will-change:transform}
 .shutter-top{top:0}.shutter-bottom{bottom:0}
-.opening-glow{position:absolute;inset:-20%;opacity:.55;pointer-events:none}
+.opening-glow{position:absolute;inset:-20%;opacity:.55;pointer-events:none;will-change:transform,opacity}
 .glow-gold{background:radial-gradient(ellipse at 62% 36%,#b87e244d,transparent 56%)}
 .glow-amber{background:radial-gradient(ellipse at 25% 65%,#b15c273d,transparent 51%)}
 .opening-horizon{position:absolute;top:calc(50% + 85px);left:0;width:100%;height:2px;background:linear-gradient(90deg,transparent,#eabc59,#fff5ce,#eabc59,transparent);transform-origin:center;transform:scaleX(.18);opacity:.35}

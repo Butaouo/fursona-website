@@ -54,8 +54,9 @@ export async function prepareOpening(signal: AbortSignal, doc = document, timeou
     else signal.addEventListener('abort', cancel, { once: true });
   });
   const resources = (async () => {
-    const content = await primaryContent(pending.signal, doc);
-    content.getBoundingClientRect(); // Resolve styles/layout before sampling the font set.
+    await primaryContent(pending.signal, doc);
+    // FontFaceSet.ready includes its layout work. Avoid forcing synchronous
+    // layout here; the visible-frame gate verifies the main layout afterwards.
     const images = Array.from(doc.querySelectorAll<HTMLImageElement>('.hero-image,.identity-card img,.wordmark img'));
     await Promise.all([doc.fonts?.ready.catch(() => {}), ...images.map(image => decodedImage(image, pending.signal))]);
     return 'ready' as const;
