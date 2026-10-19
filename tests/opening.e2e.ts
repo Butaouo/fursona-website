@@ -47,7 +47,10 @@ test('critical image decoding and fonts precede two painted frames and the full 
     await finished(page);
     const evidence = await page.evaluate(() => (window as unknown as Record<string, { phases: Array<{ phase: string; frame: number; visibility: string }>; duration: number }>).openingEvidence);
     const armed = evidence.phases.find(entry => entry.phase === 'armed')!, playing = evidence.phases.find(entry => entry.phase === 'playing')!;
-    expect(playing.frame - armed.frame).toBeGreaterThanOrEqual(2); expect(playing.visibility).toBe('visible'); expect(evidence.duration).toBe(4.6);
+    expect(playing.frame - armed.frame).toBeGreaterThanOrEqual(2); expect(playing.visibility).toBe('visible');
+    // Firefox exposes AnimationEvent.elapsedTime with float32 rounding. Keep
+    // the exact 4600ms CSS timing check above and compare event seconds to .5ms.
+    expect(evidence.duration).toBeCloseTo(4.6, 3);
     await info.attach('readiness-and-rendering', { body: JSON.stringify(evidence), contentType: 'application/json' });
   } finally { image.release(); }
 });
