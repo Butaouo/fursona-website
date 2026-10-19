@@ -1,53 +1,54 @@
 import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from 'react';
 import { useTranslation } from 'react-i18next';
 import { afterVisiblePaint, prepareOpening } from '../openingReady';
-/** Resource readiness and visible paint precede the CSS presentation timeline. */
+/** Keep startup phase changes inside the fixed overlay, outside Motion layout commits. */
 export function Opening({ enabled, route }: { enabled: boolean; route: string }) {
   const { t } = useTranslation();
+  const screen = useRef<HTMLDivElement>(null);
   const initialRoute = useRef(route);
-  const [phase, setPhase] = useState<'preparing' | 'armed' | 'playing' | 'done'>(() => {
-    if (!enabled) return 'done';
-    try { return sessionStorage.getItem('longday:opening') === 'seen' ? 'done' : 'preparing'; } catch { return 'preparing'; }
+  const [active, setActive] = useState(() => {
+    if (!enabled) return false;
+    try { return sessionStorage.getItem('longday:opening') !== 'seen'; } catch { return true; }
   });
-  const [readiness, setReadiness] = useState<'ready' | 'timeout'>();
-  const [visible, setVisible] = useState(() => document.visibilityState === 'visible');
   const remember = useCallback(() => {
     try { sessionStorage.setItem('longday:opening', 'seen'); } catch { /* The component still remembers this visit. */ }
   }, []);
-  const finish = useCallback(() => { remember(); setPhase('done'); }, [remember]);
+  const finish = useCallback(() => { remember(); setActive(false); }, [remember]);
   useEffect(() => {
-    if (!enabled || route !== initialRoute.current) { finish(); return; }
-    if (phase !== 'preparing') return;
+    if (!enabled || route !== initialRoute.current) finish();
+  }, [enabled, route, finish]);
+  useEffect(() => {
+    const root = screen.current;
+    if (!root || !active || !enabled) return;
     const controller = new AbortController();
-    void prepareOpening(controller.signal).then(result => {
-      if (!controller.signal.aborted) { setReadiness(result); setPhase('armed'); }
-    }).catch(() => { /* Navigation, skip or StrictMode cleanup cancels preparation. */ });
-    return () => controller.abort();
-  }, [enabled, route, phase, finish]);
-  useEffect(() => {
-    if (phase !== 'armed' || !enabled) return;
-    const controller = new AbortController();
-    void afterVisiblePaint(controller.signal).then(() => {
-      if (!controller.signal.aborted) setPhase('playing');
-    }).catch(() => {});
-    return () => controller.abort();
-  }, [phase, enabled]);
-  useEffect(() => { if (phase === 'playing') remember(); }, [phase, remember]);
-  useEffect(() => {
-    const update = () => setVisible(document.visibilityState === 'visible');
-    const hide = () => setVisible(false);
-    document.addEventListener('visibilitychange', update);
-    window.addEventListener('pageshow', update); window.addEventListener('pagehide', hide);
-    update();
-    return () => {
-      document.removeEventListener('visibilitychange', update);
-      window.removeEventListener('pageshow', update); window.removeEventListener('pagehide', hide);
+    const visibility = () => { root.dataset.visible = String(document.visibilityState === 'visible'); };
+    const hide = () => { root.dataset.visible = 'false'; };
+    const end = (event: AnimationEvent) => {
+      if (event.animationName === 'shutter-down' && root.dataset.phase === 'playing') finish();
     };
-  }, []);
-  return phase !== 'done' && enabled ? <div className="opening" data-testid="opening" data-phase={phase} data-readiness={readiness} data-visible={visible} onAnimationEnd={event => {
-    // CSS elapsed time advances only while the visible presentation is playing.
-    if (event.animationName === 'shutter-down' && phase === 'playing') finish();
-  }}><div aria-hidden="true"><div className="opening-shutter shutter-top" /><div className="opening-shutter shutter-bottom" /><div className="opening-glow glow-gold" /><div className="opening-glow glow-amber" /><div className="opening-signature"><span>LongDay<span className="opening-dot">.</span></span><small>HaGooLongDay</small></div><div className="opening-horizon" /></div><button type="button" className="opening-skip" onClick={finish}>{t('skipOpening')} <span aria-hidden="true">↗</span></button></div> : null;
+    // Native events stay local to this overlay; per-phase React commits would
+    // also schedule Motion's page-wide projection/layout work during startup.
+    root.dataset.phase = 'preparing'; visibility();
+    root.addEventListener('animationend', end);
+    document.addEventListener('visibilitychange', visibility);
+    window.addEventListener('pageshow', visibility); window.addEventListener('pagehide', hide);
+    void (async () => {
+      const result = await prepareOpening(controller.signal);
+      if (controller.signal.aborted) return;
+      root.dataset.readiness = result;
+      root.dataset.phase = 'armed';
+      await afterVisiblePaint(controller.signal);
+      if (controller.signal.aborted) return;
+      root.dataset.phase = 'playing';
+      remember();
+    })().catch(() => { if (!controller.signal.aborted) finish(); });
+    return () => {
+      controller.abort(); root.removeEventListener('animationend', end);
+      document.removeEventListener('visibilitychange', visibility);
+      window.removeEventListener('pageshow', visibility); window.removeEventListener('pagehide', hide);
+    };
+  }, [active, enabled, finish, remember]);
+  return active && enabled ? <div ref={screen} className="opening" data-testid="opening" data-phase="preparing" data-visible={document.visibilityState === 'visible'}><div aria-hidden="true"><div className="opening-shutter shutter-top" /><div className="opening-shutter shutter-bottom" /><div className="opening-glow glow-gold" /><div className="opening-glow glow-amber" /><div className="opening-signature"><span>LongDay<span className="opening-dot">.</span></span><small>HaGooLongDay</small></div><div className="opening-horizon" /></div><button type="button" className="opening-skip" onClick={finish}>{t('skipOpening')} <span aria-hidden="true">↗</span></button></div> : null;
 }
 /** Observe real content nodes, preserving semantics and reader ordering. */
 export function SceneMotion({ children, enabled }: PropsWithChildren<{ enabled: boolean }>) {
