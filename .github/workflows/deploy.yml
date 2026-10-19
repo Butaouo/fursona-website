@@ -42,12 +42,15 @@ jobs:
         run: npm run build
       - name: Install browser test engines
         run: npx playwright install --with-deps chromium firefox webkit
-      # Xvfb supplies the Linux WebKit display backend; all assertions remain active.
-      - name: Test desktop, mobile, preferences, music, links and accessibility
-        run: xvfb-run -a npm run test:e2e -- --headed
+      # Audit before the long browser suite for faster performance feedback.
+      # Every browser assertion still runs even if the audit fails; either failure blocks deployment.
       - name: Audit mobile and desktop performance
         if: success() || (failure() && steps.build.outcome == 'success')
         run: npm run audit
+      # Xvfb supplies the Linux WebKit display backend; all assertions remain active.
+      - name: Test desktop, mobile, preferences, music, links and accessibility
+        if: success() || (failure() && steps.build.outcome == 'success')
+        run: xvfb-run -a npm run test:e2e -- --headed
       - name: Upload verification evidence
         if: always()
         uses: actions/upload-artifact@v6
