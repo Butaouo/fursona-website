@@ -124,7 +124,7 @@ test('skip works during preparation and reduced-motion never enters a waiting sc
   } finally { image.release(); }
 });
 
-test('external entry, session refresh and a warm fresh tab retain the startup rules', async ({ page, context, browserName, baseURL }, info) => {
+test('external entry and session refresh retain the startup rules', async ({ page, context, browserName, baseURL }) => {
   if (browserName === 'chromium') {
     const network = await context.newCDPSession(page);
     await network.send('Network.enable');
@@ -138,6 +138,14 @@ test('external entry, session refresh and a warm fresh tab retain the startup ru
   await page.getByRole('button', { name: '跳過動畫', exact: true }).click();
   await page.reload(); await expect(page.locator('#hero-heading')).toBeVisible();
   await expect(page.getByTestId('opening')).toHaveCount(0);
+});
+
+// Cache warming and return navigation have their own normal test budget.
+// Keeping two separate full visits in the external-entry test exhausted its
+// deadline on the shared WebKit runner before its final assertions could run.
+test('a warm fresh tab plays once and returning home does not replay it', async ({ page, context, browserName, baseURL }, info) => {
+  await page.goto(baseURL!, { waitUntil: 'domcontentloaded' }); await started(page);
+  await page.getByRole('button', { name: '跳過動畫', exact: true }).click();
   const warm = await context.newPage();
   try {
     if (browserName === 'chromium') {
