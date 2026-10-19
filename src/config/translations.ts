@@ -1,6 +1,6 @@
 export const translations = {
   'zh-TW': {
-    skip: '跳至主要內容', navLabel: '主選單', home: '首頁', connect: '找我玩', gallery: '角色圖鑑',
+    skip: '跳至主要內容', skipOpening: '跳過動畫', navLabel: '主選單', home: '首頁', connect: '找我玩', gallery: '角色圖鑑',
     welcome: '歡迎來到久天的小天地', heroTitle: '久天', hello: '你好，我是',
     heroCaption: '一隻貓狐，一點陽光。', discover: '認識久天', sayHello: '來打個招呼',
     portraitAlt: '久天完整角色插畫，奶油白毛色、金黃尾尖與琥珀眼睛，穿著淺色連帽外套',
@@ -32,7 +32,7 @@ export const translations = {
     imageOpen: '另開圖片', galleryTabs: '選擇角色圖片',
   },
   en: {
-    skip: 'Skip to main content', navLabel: 'Main navigation', home: 'Home', connect: 'Say hello', gallery: 'Fursona',
+    skip: 'Skip to main content', skipOpening: 'Skip intro', navLabel: 'Main navigation', home: 'Home', connect: 'Say hello', gallery: 'Fursona',
     welcome: 'WELCOME TO MY LITTLE CORNER', heroTitle: 'LongDay', hello: 'Hey, I’m',
     heroCaption: 'Part cat. Part fox. A little sunshine.', discover: 'Meet LongDay', sayHello: 'Come say hello',
     portraitAlt: 'Full illustration of LongDay, a cream-white cat-fox with a golden tail tip and amber eyes, wearing a light hooded coat',

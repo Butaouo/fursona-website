@@ -18,7 +18,9 @@ test('opening plays once and never traps input or repeats on return',async({page
   });
   await page.goto('./');
   await expect.poll(()=>page.evaluate(()=>(window as unknown as Record<string,number>).openingSeen)).toBeGreaterThan(0);
-  await expect(page.getByTestId('opening')).toHaveCount(0);
+  await expect(page.getByTestId('opening')).toHaveAttribute('data-phase','playing',{timeout:12000});
+  // The requested 4.6s presentation starts after readiness, not React mount.
+  await expect(page.getByTestId('opening')).toHaveCount(0,{timeout:7000});
   await page.getByRole('link',{name:'商品',exact:true}).click();
   await expect(page.locator('main h1')).toContainText('商品');
   await page.getByRole('link',{name:'首頁',exact:true}).click();
