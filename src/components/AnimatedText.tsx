@@ -8,12 +8,13 @@ export function AnimatedText({ children, reveal = false }: { children: string; r
   const enabled = useContext(AnimationContext);
   const [display, setDisplay] = useState(children);
   const [phase, setPhase] = useState(enabled && reveal ? 'in' : 'idle');
+  const [resizing, setResizing] = useState(false);
   useEffect(() => {
-    if (!enabled) { setDisplay(children); setPhase('idle'); return; }
-    if (children === display) { if (!reveal) { setPhase('idle'); return; } const timer = setTimeout(() => setPhase('idle'), 700); return () => clearTimeout(timer); }
-    setPhase('out');
+    if (!enabled) { setDisplay(children); setPhase('idle'); setResizing(false); return; }
+    if (children === display) { setResizing(false); if (!reveal) { setPhase('idle'); return; } const timer = setTimeout(() => setPhase('idle'), 700); return () => clearTimeout(timer); }
+    setResizing(true); setPhase('out');
     const swap = setTimeout(() => { setDisplay(children); setPhase('in'); }, 220);
-    const finish = setTimeout(() => setPhase('idle'), 780);
+    const finish = setTimeout(() => { setPhase('idle'); setResizing(false); }, 780);
     return () => { clearTimeout(swap); clearTimeout(finish); };
     // display is deliberately the previous committed label during the exit phase.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -30,7 +31,10 @@ export function AnimatedText({ children, reveal = false }: { children: string; r
     const chars = graphemes(part).map(char => <span className="animated-character" key={index} style={{ '--delay': `${Math.min(index++ * 8, 140)}ms` } as CSSProperties}>{char}</span>);
     return /^[A-Za-z0-9]/.test(part) ? <span className="animated-word" key={group}>{chars}</span> : <Fragment key={group}>{chars}</Fragment>;
   });
-  return <m.span layout={enabled ? 'size' : false} transition={{ layout: { duration: .45, ease: [.22, 1, .36, 1] } }} className={`animated-label label-${enabled ? phase : 'idle'}`}>
+  // Only a language change needs layout projection. Initial text and its CSS
+  // reveal keep the same size; measuring every label during startup competes
+  // with critical image decoding and the opening's first visible frames.
+  return <m.span layout={enabled && resizing ? 'size' : false} transition={{ layout: { duration: .45, ease: [.22, 1, .36, 1] } }} className={`animated-label label-${enabled ? phase : 'idle'}`}>
     <span className="sr-only">{children}</span>
     <span className="label-reserve" aria-hidden="true">{children}</span>
     <span className="label-ink" aria-hidden="true" key={text}>{letters}</span>
