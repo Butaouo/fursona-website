@@ -39,8 +39,6 @@
 .opening-horizon{position:absolute;top:calc(50% + 85px);left:0;width:100%;height:2px;background:linear-gradient(90deg,transparent,#eabc59,#fff5ce,#eabc59,transparent);transform-origin:center;transform:scaleX(.18);opacity:.35}
 .opening-signature{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff0cd;font-size:clamp(44px,10vw,96px);font-weight:700;letter-spacing:-.06em}
 .opening-signature small{font-size:10px;letter-spacing:.3em;margin-top:10px}.opening-dot{color:#e9b849}
-.opening-skip{position:absolute;right:max(22px,env(safe-area-inset-right));top:max(22px,env(safe-area-inset-top));pointer-events:auto;min-height:44px;padding:10px 18px;border:1px solid #d0aa5f80;border-radius:100px;background:#29241deb;color:#fff0cd;font-size:12px;letter-spacing:.06em;cursor:pointer}
-.opening-skip:focus-visible{outline:3px solid #fff0cd;outline-offset:4px}.opening-skip:active{transform:scale(.96)}
 .opening[data-phase=playing] .opening-shutter{animation-duration:4.6s;animation-fill-mode:both;animation-timing-function:cubic-bezier(.76,0,.24,1)}
 .opening[data-phase=playing] .shutter-top{animation-name:shutter-up}.opening[data-phase=playing] .shutter-bottom{animation-name:shutter-down}
 .opening[data-phase=playing] .opening-signature{animation:opening-sign 4.6s both}

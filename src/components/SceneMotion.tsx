@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from 'react';
-import { useTranslation } from 'react-i18next';
 import { afterVisiblePaint, prepareOpening } from '../openingReady';
 /** Keep startup phase changes inside the fixed overlay, outside Motion layout commits. */
 export function Opening({ enabled, route }: { enabled: boolean; route: string }) {
-  const { t } = useTranslation();
   const screen = useRef<HTMLDivElement>(null);
   const initialRoute = useRef(route);
   const [active, setActive] = useState(() => {
@@ -48,7 +46,7 @@ export function Opening({ enabled, route }: { enabled: boolean; route: string })
       window.removeEventListener('pageshow', visibility); window.removeEventListener('pagehide', hide);
     };
   }, [active, enabled, finish, remember]);
-  return active && enabled ? <div ref={screen} className="opening" data-testid="opening" data-phase="preparing" data-visible={document.visibilityState === 'visible'}><div aria-hidden="true"><div className="opening-shutter shutter-top" /><div className="opening-shutter shutter-bottom" /><div className="opening-glow glow-gold" /><div className="opening-glow glow-amber" /><div className="opening-signature"><span>LongDay<span className="opening-dot">.</span></span><small>HaGooLongDay</small></div><div className="opening-horizon" /></div><button type="button" className="opening-skip" onClick={finish}>{t('skipOpening')} <span aria-hidden="true">↗</span></button></div> : null;
+  return active && enabled ? <div ref={screen} className="opening" aria-hidden="true" data-testid="opening" data-phase="preparing" data-visible={document.visibilityState === 'visible'}><div className="opening-shutter shutter-top" /><div className="opening-shutter shutter-bottom" /><div className="opening-glow glow-gold" /><div className="opening-glow glow-amber" /><div className="opening-signature"><span>LongDay<span className="opening-dot">.</span></span><small>HaGooLongDay</small></div><div className="opening-horizon" /></div> : null;
 }
 /** Observe real content nodes, preserving semantics and reader ordering. */
 export function SceneMotion({ children, enabled }: PropsWithChildren<{ enabled: boolean }>) {
