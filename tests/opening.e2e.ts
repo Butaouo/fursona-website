@@ -34,6 +34,7 @@ test('critical image decoding and fonts precede two painted frames and the full 
   try {
     await page.goto('./', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('opening')).toHaveAttribute('data-phase', 'preparing');
+    await expect(page.getByTestId('opening').locator('button')).toHaveCount(0);
     // Deliberately exceed the old 1.15s lifetime while the resource is pending.
     await page.waitForTimeout(1300);
     expect(await page.evaluate(() => ({ phase: document.querySelector('.opening')?.getAttribute('data-phase'), seen: sessionStorage.getItem('longday:opening'), animations: document.querySelector('.shutter-bottom')?.getAnimations().length }))).toEqual({ phase: 'preparing', seen: null, animations: 0 });
@@ -42,6 +43,7 @@ test('critical image decoding and fonts precede two painted frames and the full 
     await expect(page.getByTestId('opening')).toHaveAttribute('data-phase', 'preparing');
     await page.evaluate(() => ((window as unknown as Record<string, () => void>).releaseOpeningFonts)());
     await started(page);
+    await expect(page.getByTestId('opening').locator('button')).toHaveCount(0);
     const timing = await page.locator('.shutter-bottom').evaluate(node => node.getAnimations()[0].effect!.getTiming());
     expect(timing.duration).toBe(4600);
     await finished(page);
@@ -88,15 +90,15 @@ test('hidden startup and a hidden interval cannot spend the visible presentation
   await info.attach('visibility-timeline', { body: JSON.stringify({ before, after, evidence, visibilitySimulation: true }), contentType: 'application/json' });
 });
 
-test('failed critical images settle and the bilingual skip control works with keyboard or touch', async ({ page, hasTouch }) => {
+test('failed critical images settle and the complete opening has no skip control in either language', async ({ page, hasTouch }) => {
+  if (hasTouch) await page.addInitScript(() => localStorage.setItem('longday:language', 'en'));
   await page.route('**/images/lyont-hero*.webp', route => route.abort());
   await page.goto('./', { waitUntil: 'domcontentloaded' }); await started(page);
   await expect(page.getByTestId('opening')).toHaveAttribute('data-readiness', 'ready');
   await expect(page.locator('.image-fallback')).toBeVisible();
-  const skip = page.getByRole('button', { name: '跳過動畫', exact: true });
-  if (hasTouch) { const bounds = await skip.boundingBox(); await page.touchscreen.tap(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2); }
-  else await skip.press('Enter');
-  await expect(page.getByTestId('opening')).toHaveCount(0);
+  await expect(page.getByTestId('opening').locator('button')).toHaveCount(0);
+  await expect(page.locator('html')).toHaveAttribute('lang', hasTouch ? 'en' : 'zh-TW');
+  await finished(page);
   await page.reload(); await expect(page.locator('#hero-heading')).toBeVisible();
   await expect(page.getByTestId('opening')).toHaveCount(0);
 });
@@ -109,22 +111,21 @@ test('stalled images hit the bounded escape hatch instead of trapping the visito
     await expect(page.getByTestId('opening')).toHaveAttribute('data-phase', 'preparing');
     await expect(page.getByTestId('opening')).toHaveAttribute('data-readiness', 'timeout', { timeout: 11000 });
     await started(page);
-    await page.getByRole('button', { name: '跳過動畫', exact: true }).click();
-    await expect(page.getByTestId('opening')).toHaveCount(0);
+    await finished(page);
     await page.getByRole('link', { name: '設定', exact: true }).click();
     await expect(page.locator('main h1')).toContainText('設定');
   } finally { image.release(); }
 });
 
-test('skip works during preparation and reduced-motion never enters a waiting screen', async ({ page }) => {
+test('reduced-motion cancels preparation and never enters a waiting screen', async ({ page }) => {
   const image = held();
   await page.route('**/images/lyont-hero*.webp', async route => { await image.promise; await route.continue(); });
   try {
     await page.goto('./', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('opening')).toHaveAttribute('data-phase', 'preparing');
-    await page.getByRole('button', { name: '跳過動畫', exact: true }).click();
-    await expect(page.getByTestId('opening')).toHaveCount(0);
+    await expect(page.getByTestId('opening').locator('button')).toHaveCount(0);
     await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(page.getByTestId('opening')).toHaveCount(0);
     await page.evaluate(() => sessionStorage.removeItem('longday:opening'));
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.locator('#hero-heading')).toBeVisible();
@@ -143,7 +144,7 @@ test('external entry and session refresh retain the startup rules', async ({ pag
   await page.goto(entry); await page.unroute(entry);
   await page.getByRole('link', { name: 'LongDay', exact: true }).click(); await started(page);
   expect(await page.evaluate(() => document.referrer)).toBe(entry);
-  await page.getByRole('button', { name: '跳過動畫', exact: true }).click();
+  await finished(page);
   await page.reload(); await expect(page.locator('#hero-heading')).toBeVisible();
   await expect(page.getByTestId('opening')).toHaveCount(0);
 });
@@ -152,8 +153,11 @@ test('external entry and session refresh retain the startup rules', async ({ pag
 // Keeping two separate full visits in the external-entry test exhausted its
 // deadline on the shared WebKit runner before its final assertions could run.
 test('a warm fresh tab plays once and returning home does not replay it', async ({ page, context, browserName, baseURL }, info) => {
-  await page.goto(baseURL!, { waitUntil: 'domcontentloaded' }); await started(page);
-  await page.getByRole('button', { name: '跳過動畫', exact: true }).click();
+  // Warm the cache from a returning visitor's tab. This page-only fixture does
+  // not affect the fresh tab below, which must play its full opening normally.
+  await page.addInitScript(() => sessionStorage.setItem('longday:opening', 'seen'));
+  await page.goto(baseURL!, { waitUntil: 'domcontentloaded' });
+  await page.locator('.hero-image').evaluate((image: HTMLImageElement) => image.decode());
   const warm = await context.newPage();
   try {
     if (browserName === 'chromium') {
@@ -162,7 +166,7 @@ test('a warm fresh tab plays once and returning home does not replay it', async 
       await network.send('Network.emulateNetworkConditions', { offline: false, latency: 400, downloadThroughput: 500_000 / 8, uploadThroughput: 250_000 / 8 });
     }
     await warm.goto(baseURL!, { waitUntil: 'domcontentloaded' }); await started(warm);
-    await warm.getByRole('button', { name: '跳過動畫', exact: true }).click();
+    await finished(warm);
     await warm.getByRole('link', { name: '設定', exact: true }).click(); await expect(warm.locator('main h1')).toContainText('設定');
     await warm.getByRole('link', { name: '首頁', exact: true }).click(); await expect(warm.locator('#hero-heading')).toBeVisible();
     await expect(warm.getByTestId('opening')).toHaveCount(0);
