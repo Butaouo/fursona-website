@@ -19,7 +19,9 @@ jobs:
   verify:
     if: github.event_name != 'schedule' || vars.GOOGLE_SYNC_ENABLED == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # Opening scenarios now wait for the full presentation instead of dismissing
+    # it. Allow aggregate runner time; individual test and audit gates stay unchanged.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v6
