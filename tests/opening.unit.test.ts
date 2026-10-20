@@ -63,7 +63,7 @@ describe('opening readiness is based on resources, not a playback delay', () => 
     await vi.advanceTimersByTimeAsync(7999); expect(result).toBeUndefined();
     await vi.advanceTimersByTimeAsync(1); await ready; expect(result).toBe('timeout'); expect(vi.getTimerCount()).toBe(0);
   });
-  it('cancels preparation and clears the deadline on skip or unmount', async () => {
+  it('cancels preparation and clears the deadline on navigation or unmount', async () => {
     vi.useFakeTimers(); const doc = new DocumentProbe(), controller = new AbortController();
     doc.fonts.ready = new Promise(() => {});
     const ready = prepareOpening(controller.signal, asDocument(doc));
@@ -97,7 +97,7 @@ describe('opening requires fresh visible rendering opportunities', () => {
     frames.frame(); frames.frame(); await flush(); expect(painted).toBe(false);
     doc.width = 390; frames.frame(); frames.frame(); await ready; expect(painted).toBe(true);
   });
-  it('cancels pending frame callbacks when the visitor skips', async () => {
+  it('cancels pending frame callbacks when preparation is aborted', async () => {
     const doc = new DocumentProbe(), frames = new Frames(), controller = new AbortController();
     const ready = afterVisiblePaint(controller.signal, asDocument(doc), frames as unknown as Window);
     const rejected = expect(ready).rejects.toMatchObject({ name: 'AbortError' });
