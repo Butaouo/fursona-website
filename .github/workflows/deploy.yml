@@ -12,6 +12,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
+          ref: 74232fd1b40eb23159a725aac5821ae4ab790270
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
@@ -44,7 +45,7 @@ jobs:
           const originalSheet = env.GOOGLE_PUBLICATION_SHEET_ID || '';
           const trimmedSheet = originalSheet.trim();
           if (/^[\w-]{10,200}$/.test(trimmedSheet)) {
-            env.GOOGLE_PUBLICATION_SHEET_ID = trimmedSheet;
+            // Keep the original environment value; the checked-out sync must normalize it.
             report({ stage, sheetFormat: originalSheet === trimmedSheet ? 'bare-id' : 'id-with-outer-whitespace' });
           } else {
             let link;
@@ -52,8 +53,8 @@ jobs:
             const match = link.pathname.match(/^\/spreadsheets\/d\/([\w-]{10,200})(?:\/|$)/);
             if (link.protocol !== 'https:' || link.hostname !== 'docs.google.com' || link.username || link.password || link.port || !match) stop('SHEET_URL_NOT_APPROVED_GOOGLE_SHEETS_LINK');
             // Normalize only inside this read-only process. Never alter repository Secrets.
-            env.GOOGLE_PUBLICATION_SHEET_ID = match[1];
-            report({ stage, sheetFormat: 'full-google-sheets-url', normalizedInMemory: true });
+            // Keep the original environment value; the checked-out sync must normalize it.
+            report({ stage, sheetFormat: 'full-google-sheets-url', normalizationDelegatedToCheckedOutSync: true });
           }
           report({ stage, status: 'valid' });
           
