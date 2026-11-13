@@ -1,11 +1,17 @@
 name: Test and deploy LongDay to GitHub Pages
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        description: Read-only verification mode
+        default: google
+        options: [google, production]
 permissions:
   contents: read
 jobs:
   diagnose:
-    if: github.ref == 'refs/heads/diagnostics/google-publication' && github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/diagnostics/google-publication' && github.event_name == 'workflow_dispatch' && inputs.mode != 'production'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -109,3 +115,110 @@ jobs:
             stop(known.get(error?.message) || 'SYNC_ERROR_DETAILS_WITHHELD');
           }
           DIAGNOSTIC
+
+  verify-production:
+    if: github.ref == 'refs/heads/diagnostics/google-publication' && inputs.mode == 'production'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Verify published diary and responsive routes on longday.tw
+        run: |
+          xvfb-run -a node --input-type=module <<'VERIFY'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { mkdir } from 'node:fs/promises';
+          import { chromium, firefox, webkit, devices, request } from '@playwright/test';
+          
+          const origin = 'https://longday.tw/';
+          const api = await request.newContext();
+          const response = await api.get(`${origin}content/catalog.json`);
+          assert.equal(response.status(), 200, 'Published catalog must load over HTTPS');
+          const catalog = await response.json();
+          const article = catalog.articles.find(a => a.id === 'diary-01');
+          assert(article && article.title['zh-TW'] === '台灣' && article.kind === 'diary', 'Published diary must exist');
+          assert(article.blocks.length > 0, 'Published article must contain its body');
+          const expectedText = article.blocks.filter(b => b.type === 'paragraph' || b.type === 'heading').map(b => b.runs.map(r => r.text).join(''));
+          const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+          const profiles = [
+            ['desktop-chromium', chromium, { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 1000 } }],
+            ['desktop-firefox', firefox, devices['Desktop Firefox']],
+            ['desktop-webkit', webkit, devices['Desktop Safari']],
+            ['iphone-webkit', webkit, devices['iPhone 13']],
+            ['android-chromium', chromium, devices['Pixel 7']],
+          ];
+          await mkdir('reports', { recursive: true });
+          try {
+            for (const [name, engine, options] of profiles) {
+              const browser = await engine.launch();
+              try {
+                const context = await browser.newContext({ ...options, locale: 'zh-TW', colorScheme: 'light' });
+                const page = await context.newPage();
+                const errors = [];
+                page.on('pageerror', e => errors.push(e.message));
+                page.on('response', r => { if (r.url().startsWith(origin) && r.status() >= 400) errors.push(`Resource HTTP ${r.status()}`); });
+                const { expect } = await import('@playwright/test');
+                const noOverflow = async () => assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'No horizontal overflow');
+                await page.goto(`${origin}#/archive`, { waitUntil: 'domcontentloaded' });
+                await expect(page.locator('main h1')).toContainText('創作');
+                await expect(page.getByTestId('opening')).toHaveCount(0, { timeout: 19000 });
+                await page.getByRole('button', { name: '日記', exact: true }).click();
+                const card = page.locator('.archive-card').filter({ has: page.getByRole('heading', { name: '台灣', exact: true }) });
+                await expect(card).toBeVisible();
+                await noOverflow();
+                await page.screenshot({ path: `reports/${name}-published-archive.png`, fullPage: false });
+                await card.click();
+                await expect(page).toHaveURL(`${origin}#/archive/diary-01`);
+                await expect(page.locator('.reader-heading h1')).toContainText('台灣');
+                const rendered = page.locator('.reader-body > p, .reader-body > h2, .reader-body > h3');
+                await expect(rendered).toHaveCount(expectedText.length);
+                assert.equal(digest(await rendered.allTextContents()), digest(expectedText), 'Reader must preserve every published text block');
+                await noOverflow();
+                await page.screenshot({ path: `reports/${name}-published-diary.png`, fullPage: false });
+                await page.reload();
+                await expect(page.locator('.reader-heading h1')).toContainText('台灣');
+                assert.equal(digest(await rendered.allTextContents()), digest(expectedText), 'Direct refresh must preserve the full body');
+                const currentUrl = page.url();
+                for (const theme of ['dark', 'light']) {
+                  await page.getByTestId(`theme-${theme}`).click();
+                  await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+                  assert.equal(page.url(), currentUrl);
+                  await expect(page.getByTestId('opening')).toHaveCount(0);
+                  await noOverflow();
+                }
+                await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
+                await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+                assert.equal(page.url(), currentUrl);
+                assert.equal(digest(await rendered.allTextContents()), digest(expectedText), 'Language switch must not rewrite the author body');
+                await noOverflow();
+                for (const [route, heading] of [['about','Character'], ['relationships','Relationships'], ['shop','Shop'], ['',null]]) {
+                  await page.goto(`${origin}#/${route}`);
+                  if (heading) await expect(page.locator('main h1')).toContainText(heading);
+                  else await expect(page.locator('#hero-heading')).toBeVisible();
+                  await noOverflow();
+                }
+                await expect(page.locator('.social-grid > .social-link')).toHaveCount(11);
+                await expect(page.locator('.hero-image')).toBeVisible();
+                await expect.poll(() => page.locator('.hero-image').evaluate(n => n.complete && n.naturalWidth > 0)).toBe(true);
+                assert.deepEqual(errors, [], 'No fatal JavaScript errors or same-origin resource failures');
+                console.log(JSON.stringify({ profile: name, status: 'passed', article: 'diary-01', bodyMatchesCatalog: true, textBlocks: expectedText.length, responsive: true, refresh: true, preferences: true, otherRoutes: true, errors: 0, simulation: name.includes('iphone') || name.includes('android') }));
+              } finally { await browser.close(); }
+            }
+          } finally { await api.dispose(); }
+          VERIFY
+      - name: Upload production verification screenshots
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: longday-published-diary-verification
+          path: reports/
+          retention-days: 30
