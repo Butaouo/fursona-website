@@ -10,6 +10,16 @@ const MAX_BYTES = 20 * 1024 * 1024;
 const scopes = ['documents.readonly','drive.readonly','spreadsheets.readonly'].map(s=>`https://www.googleapis.com/auth/${s}`).join(' ');
 const fail = (message) => { throw new Error(message); };
 const validId = value => /^[\w-]{10,200}$/.test(value || '') ? value : fail('Invalid Google identifier in publication configuration');
+/** Accept the ID or an ordinary Sheets share link without changing stored secrets. */
+export function publicationSheetId(value) {
+  const input = typeof value === 'string' ? value.trim() : '';
+  if (/^[\w-]{10,200}$/.test(input)) return input;
+  let url;
+  try { url = new URL(input); } catch { fail('Invalid publication Sheet ID or Google Sheets URL'); }
+  const match = url.pathname.match(/^\/spreadsheets\/d\/([\w-]{10,200})(?:\/|$)/);
+  if (url.protocol !== 'https:' || url.hostname !== 'docs.google.com' || url.port || url.username || url.password || !match) fail('Invalid publication Sheet ID or Google Sheets URL');
+  return validId(match[1]);
+}
 const localized = (value, english = '') => ({ 'zh-TW': String(value || ''), ...(english ? { en: String(english) } : {}) });
 export function rows(values = []) {
   if (!values.length) return [];
@@ -69,7 +79,7 @@ export async function sync({ env=process.env, request=fetch, output=resolve('pub
   const credentials=JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_JSON || '{}');
   const token=await accessToken(credentials,request);
   const get=async url=>{const response=await request(url,{headers:{Authorization:`Bearer ${token}`},redirect:'error',signal:AbortSignal.timeout(30000)});if(!response.ok)fail(`Google API request failed (HTTP ${response.status}); source details withheld`);return response;};
-  const sheet=validId(env.GOOGLE_PUBLICATION_SHEET_ID);
+  const sheet=publicationSheetId(env.GOOGLE_PUBLICATION_SHEET_ID);
   const values=await (await get(`https://sheets.googleapis.com/v4/spreadsheets/${sheet}/values:batchGet?ranges=Articles!A1:Q1001&ranges=Products!A1:O201`)).json();
   if(values.valueRanges?.length!==2)fail('Both Articles and Products sheets are required');
   const articles=rows(values.valueRanges[0].values),products=rows(values.valueRanges[1].values);
