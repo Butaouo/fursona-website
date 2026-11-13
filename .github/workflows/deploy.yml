@@ -6,12 +6,12 @@ on:
         type: choice
         description: Read-only verification mode
         default: google
-        options: [google, production]
+        options: [google, production, audit]
 permissions:
   contents: read
 jobs:
   diagnose:
-    if: github.ref == 'refs/heads/diagnostics/google-publication' && github.event_name == 'workflow_dispatch' && inputs.mode != 'production'
+    if: github.ref == 'refs/heads/diagnostics/google-publication' && github.event_name == 'workflow_dispatch' && inputs.mode == 'google'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -278,5 +278,40 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: longday-published-diary-verification
+          path: reports/
+          retention-days: 30
+
+  audit-candidate:
+    if: github.ref == 'refs/heads/diagnostics/google-publication' && github.event_name == 'workflow_dispatch' && inputs.mode == 'audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          ref: fix/release-motion-loading
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Measure the unchanged acceptance gates
+        run: npm run audit
+      - name: Explain the measured bottlenecks
+        if: always()
+        run: |
+          node --input-type=module <<'AUDIT'
+          import { readFile } from 'node:fs/promises';
+          for (const profile of ['mobile','desktop']) {
+            const report = JSON.parse(await readFile(`reports/lighthouse-${profile}.json`, 'utf8'));
+            const keys = ['first-contentful-paint','largest-contentful-paint','speed-index','total-blocking-time','cumulative-layout-shift','mainthread-work-breakdown','bootup-time','long-tasks','lcp-breakdown-insight','forced-reflow-insight','network-dependency-tree-insight'];
+            console.log(JSON.stringify({profile,audits:Object.fromEntries(keys.filter(key=>report.audits[key]).map(key=>[key,report.audits[key]]))}));
+          }
+          AUDIT
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: longday-candidate-performance-diagnostics
           path: reports/
           retention-days: 30
