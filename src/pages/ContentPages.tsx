@@ -1,10 +1,11 @@
 import { useContext, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { AnimatePresence, LayoutGroup, m } from 'motion/react';
-import { asset, site, type Language } from '../config/site';
+import { asset, type Language } from '../config/site';
 import { copy, localized, readCatalog, type Article, type Catalog, type Product, type TextRun } from '../content';
 import { AnimatedText, AnimationContext } from '../components/AnimatedText';
 import { Glass } from '../components/Glass';
-import { Gallery } from '../components/Gallery';
+import { CharacterPage } from '../components/CharacterPage';
+import type { EffectiveTheme } from '../config/characterCopy';
 
 type Props = { language: Language };
 const label = (key: Parameters<typeof copy>[0], language: Language) => <AnimatedText reveal>{copy(key, language)}</AnimatedText>;
@@ -92,13 +93,13 @@ function Shop({ catalog, language }: Props & { catalog:Catalog }) {
   const products=[...catalog.products].filter(p => !p.placeholder).sort((a,b)=>a.order-b.order);
   return <><PageTitle title="shop" intro="shopIntro" language={language}/><LayoutGroup>{products.length > 0 && <div className="shop-grid" inert={selected?true:undefined}>{products.map(p=><m.button key={p.id} layoutId={`product-${p.id}`} className="product-card glass" onClick={()=>setSelected(p)} animate={{opacity:selected&&selected.id!==p.id?.16:1}} whileHover={{y:-4}} whileTap={{scale:.985}}>{p.image && <Media src={p.image} alt="" retryable={false}/>}<div className="product-card-copy"><span className="eyebrow">{localized(p.status,language)}</span><h2>{localized(p.name,language)}</h2><p>{localized(p.summary,language)}</p>{p.price&&<strong>{p.price}</strong>}<span className="text-link">{copy('preview',language)} ↗</span></div></m.button>)}</div>}<AnimatePresence>{selected&&<ProductDetail product={selected} language={language} onClose={closeRef.current}/>}</AnimatePresence></LayoutGroup></>;
 }
-export default function ContentPages({ route, language }: Props & { route:string }) {
+export default function ContentPages({ route, language, theme }: Props & { route:string; theme: EffectiveTheme }) {
   const [catalog,setCatalog]=useState<Catalog|null>(null);
   const [error,setError]=useState(false);
   const [attempt,setAttempt]=useState(0);
   const needsCatalog=['archive','relationships','shop'].includes(route.split('/')[0]);
   useEffect(()=>{if(!needsCatalog)return;const controller=new AbortController();setError(false);fetch(asset('content/catalog.json'),{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('Unavailable');return r.json();}).then(readCatalog).then(setCatalog).catch(()=>{if(!controller.signal.aborted)setError(true);});return()=>controller.abort();},[attempt,needsCatalog]);
-  if(route==='about')return <div className="content-page page-width"><PageTitle title="about" intro="aboutIntro" language={language}/><p className="about-tagline"><AnimatedText>{site.person.tagline[language]}</AnimatedText></p><Gallery language={language}/><a className="button button-primary" href="#connect">{language==='en'?'Find me online':'來找我聊聊'} ↗</a></div>;
+  if(route==='about')return <CharacterPage language={language} theme={theme} />;
   if(!['archive','relationships','shop'].includes(route.split('/')[0]))return <div className="content-page page-width"><Empty title={copy('notFound',language)}/><a href="#/">{copy('home',language)}</a></div>;
   if(error)return <div className="content-page page-width"><Empty title={copy('loadError',language)}/><button className="button button-secondary" onClick={()=>setAttempt(x=>x+1)}>{copy('retry',language)}</button></div>;
   if(!catalog)return <p className="content-loading page-width" role="status">{copy('loading',language)}</p>;
