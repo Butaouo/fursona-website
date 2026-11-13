@@ -124,19 +124,23 @@ jobs:
           xvfb-run -a node --input-type=module <<'VERIFY'
           import assert from 'node:assert/strict';
           import { createHash } from 'node:crypto';
-          import { mkdir } from 'node:fs/promises';
-          import { chromium, firefox, webkit, devices, request } from '@playwright/test';
+          import { mkdir, writeFile } from 'node:fs/promises';
+          import { chromium, firefox, webkit, devices, request, expect } from '@playwright/test';
+          import AxeBuilder from '@axe-core/playwright';
+          import { characterText } from './src/config/characterCopy.ts';
           
           const origin = 'https://longday.tw/';
-          const api = await request.newContext();
-          const response = await api.get(`${origin}content/catalog.json`);
-          assert.equal(response.status(), 200, 'Published catalog must load over HTTPS');
-          const catalog = await response.json();
-          const article = catalog.articles.find(a => a.id === 'diary-01');
-          assert(article && article.title['zh-TW'] === '台灣' && article.kind === 'diary', 'Published diary must exist');
-          assert(article.blocks.length > 0, 'Published article must contain its body');
-          const expectedText = article.blocks.filter(b => b.type === 'paragraph' || b.type === 'heading').map(b => b.runs.map(r => r.text).join(''));
+          const expectedBodyDigest = '109ac5e93334572ce27b085dc69c885013fad5ed35d887e97af37bf351bfcdac';
           const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+          const api = await request.newContext({ extraHTTPHeaders: { 'Cache-Control': 'no-cache' } });
+          const response = await api.get(`${origin}content/catalog.json`);
+          assert.equal(response.status(), 200);
+          const catalog = await response.json();
+          const article = catalog.articles.find(value => value.id === 'diary-01');
+          assert(article && article.kind === 'diary' && article.title['zh-TW'] === '台灣');
+          assert.equal(digest(article.blocks), expectedBodyDigest, 'Production must contain the newly fetched Google body');
+          const textBlocks = article.blocks.filter(block => block.type === 'paragraph' || block.type === 'heading');
+          const expectedText = textBlocks.map(block => block.runs.map(run => run.text).join(''));
           const profiles = [
             ['desktop-chromium', chromium, { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 1000 } }],
             ['desktop-firefox', firefox, devices['Desktop Firefox']],
@@ -144,6 +148,7 @@ jobs:
             ['iphone-webkit', webkit, devices['iPhone 13']],
             ['android-chromium', chromium, devices['Pixel 7']],
           ];
+          const results = [];
           await mkdir('reports', { recursive: true });
           try {
             for (const [name, engine, options] of profiles) {
@@ -152,55 +157,117 @@ jobs:
                 const context = await browser.newContext({ ...options, locale: 'zh-TW', colorScheme: 'light' });
                 const page = await context.newPage();
                 const errors = [];
-                page.on('pageerror', e => errors.push(e.message));
-                page.on('response', r => { if (r.url().startsWith(origin) && r.status() >= 400) errors.push(`Resource HTTP ${r.status()}`); });
-                const { expect } = await import('@playwright/test');
-                const noOverflow = async () => assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'No horizontal overflow');
-                await page.goto(`${origin}#/archive`, { waitUntil: 'domcontentloaded' });
-                await expect(page.locator('main h1')).toContainText('創作');
-                await expect(page.getByTestId('opening')).toHaveCount(0, { timeout: 19000 });
-                await page.getByRole('button', { name: '日記', exact: true }).click();
-                const card = page.locator('.archive-card').filter({ has: page.getByRole('heading', { name: '台灣', exact: true }) });
-                await expect(card).toBeVisible();
-                await noOverflow();
-                await page.screenshot({ path: `reports/${name}-published-archive.png`, fullPage: false });
-                await card.click();
-                await expect(page).toHaveURL(`${origin}#/archive/diary-01`);
-                await expect(page.locator('.reader-heading h1')).toContainText('台灣');
-                const rendered = page.locator('.reader-body > p, .reader-body > h2, .reader-body > h3');
-                await expect(rendered).toHaveCount(expectedText.length);
-                assert.equal(digest(await rendered.allTextContents()), digest(expectedText), 'Reader must preserve every published text block');
-                await noOverflow();
-                await page.screenshot({ path: `reports/${name}-published-diary.png`, fullPage: false });
-                await page.reload();
-                await expect(page.locator('.reader-heading h1')).toContainText('台灣');
-                assert.equal(digest(await rendered.allTextContents()), digest(expectedText), 'Direct refresh must preserve the full body');
-                const currentUrl = page.url();
-                for (const theme of ['dark', 'light']) {
-                  await page.getByTestId(`theme-${theme}`).click();
-                  await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
-                  assert.equal(page.url(), currentUrl);
-                  await expect(page.getByTestId('opening')).toHaveCount(0);
+                page.on('pageerror', error => errors.push(error.message));
+                page.on('response', result => { if (result.url().startsWith(origin) && result.status() >= 400) errors.push(`Resource HTTP ${result.status()}`); });
+                const noOverflow = async () => assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+                const quote = position => page.locator(`[data-copy-position="${position}"] [data-copy-current]`);
+                const pictureLoaded = image => expect.poll(() => image.evaluate(node => node.complete && node.naturalWidth > 0)).toBe(true);
+                const theme = async choice => {
+                  await page.getByTestId(`theme-${choice}`).click();
+                  await expect(page.locator('html')).toHaveAttribute('data-theme', choice);
+                };
+                await page.goto(origin, { waitUntil: 'domcontentloaded' });
+                const opening = page.getByTestId('opening');
+                await expect(opening).toHaveAttribute('data-phase', 'playing', { timeout: 12000 });
+                await expect(opening.locator('.shutter-bottom')).toHaveCSS('animation-duration', '4.6s');
+                await expect(page.getByRole('button', { name: /Skip Intro|跳過動畫/i })).toHaveCount(0);
+                await expect(opening).toHaveCount(0, { timeout: 7000 });
+                await expect(page.locator('#hero-heading')).toContainText('久天');
+                await pictureLoaded(page.locator('.hero-image'));
+                await expect(page.locator('.social-grid > .social-link')).toHaveCount(11);
+                assert.equal(await page.locator('.social-panel details,.social-panel [aria-expanded]').count(), 0);
+                await expect(page.getByRole('heading', { name: 'Younger', exact: true })).toBeVisible();
+                await expect(page.getByTestId('apple-player')).toHaveCount(0);
+                await expect(page.locator('.music-external')).toHaveAttribute('href', 'https://music.apple.com/tw/album/younger/1814208594?i=1814208601');
+                for (const choice of ['light', 'dark']) {
+                  await theme(choice);
+                  await expect(quote('home')).toHaveText(characterText('home', choice, 'zh-TW'));
+                  await expect(quote('artwork')).toHaveText(characterText('artwork', choice, 'zh-TW'));
+                  await expect(page.locator('[data-copy-position="artwork"] .theme-copy-ink')).toHaveCount(1);
                   await noOverflow();
+                  await page.screenshot({ path: `reports/${name}-release-home-${choice}.png`, fullPage: false });
+                }
+                const lights = page.locator('.orb-one');
+                const beforeLight = await lights.evaluate(node => getComputedStyle(node).transform);
+                await expect.poll(() => lights.evaluate(node => getComputedStyle(node).transform)).not.toBe(beforeLight);
+                await page.getByTestId('theme-system').click();
+                for (const choice of ['light', 'dark']) {
+                  await page.emulateMedia({ colorScheme: choice });
+                  await expect(quote('home')).toHaveText(characterText('home', choice, 'zh-TW'));
                 }
                 await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
-                await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-                assert.equal(page.url(), currentUrl);
-                assert.equal(digest(await rendered.allTextContents()), digest(expectedText), 'Language switch must not rewrite the author body');
-                await noOverflow();
-                for (const [route, heading] of [['about','Character'], ['relationships','Relationships'], ['shop','Shop'], ['',null]]) {
-                  await page.goto(`${origin}#/${route}`);
-                  if (heading) await expect(page.locator('main h1')).toContainText(heading);
-                  else await expect(page.locator('#hero-heading')).toBeVisible();
+                await expect(quote('home')).toHaveText(characterText('home', 'dark', 'en'));
+                await page.getByRole('button', { name: '切換為繁體中文', exact: true }).click();
+                await page.goto(`${origin}#/about`);
+                await expect(page.locator('.character-file')).toBeVisible();
+                for (const choice of ['light', 'dark']) {
+                  await theme(choice);
+                  await expect(quote('narration')).toHaveText(characterText('narration', choice, 'zh-TW'));
+                  await expect(quote('character')).toHaveText(characterText('character', choice, 'zh-TW'));
+                  await expect(page.locator('.name-meaning dd')).toHaveText('希望日落能停留得更久');
+                  const foreground = choice === 'dark' ? 'rgb(247, 240, 228)' : 'rgb(48, 43, 34)';
+                  await expect(page.locator('body')).toHaveCSS('color', foreground);
+                  for (const label of await page.locator('.file-facts dd,.color-label > span').all()) await expect(label).toHaveCSS('color', foreground);
+                  await expect(page.locator('[data-copy-position="character"] .theme-copy-ink')).toHaveCount(1);
                   await noOverflow();
+                  await page.screenshot({ path: `reports/${name}-release-character-${choice}.png`, fullPage: false });
                 }
-                await expect(page.locator('.social-grid > .social-link')).toHaveCount(11);
-                await expect(page.locator('.hero-image')).toBeVisible();
-                await expect.poll(() => page.locator('.hero-image').evaluate(n => n.complete && n.naturalWidth > 0)).toBe(true);
-                assert.deepEqual(errors, [], 'No fatal JavaScript errors or same-origin resource failures');
-                console.log(JSON.stringify({ profile: name, status: 'passed', article: 'diary-01', bodyMatchesCatalog: true, textBlocks: expectedText.length, responsive: true, refresh: true, preferences: true, otherRoutes: true, errors: 0, simulation: name.includes('iphone') || name.includes('android') }));
+                for (const label of ['穿衣設定', '毛色設定', '角色插畫']) {
+                  await page.getByRole('tab', { name: label, exact: true }).click();
+                  const image = page.locator('[role="tabpanel"]:not([hidden]) img');
+                  await expect(image).toBeVisible(); await pictureLoaded(image);
+                }
+                await page.getByRole('button', { name: '查看完整圖片', exact: true }).click();
+                await expect(page.getByRole('dialog')).toBeVisible();
+                await page.getByRole('button', { name: '全螢幕檢視', exact: true }).click();
+                await expect(page.getByRole('dialog')).toHaveClass(/is-expanded/);
+                await page.getByRole('button', { name: '關閉', exact: true }).click();
+                await expect(page.getByRole('dialog')).not.toBeVisible();
+                await page.goto(`${origin}#/archive`);
+                await page.getByRole('button', { name: '日記', exact: true }).click();
+                await page.locator('.archive-card').filter({ has: page.getByRole('heading', { name: '台灣', exact: true }) }).click();
+                await expect(page).toHaveURL(`${origin}#/archive/diary-01`);
+                const paragraphs = page.locator('.reader-body > p,.reader-body > h2,.reader-body > h3');
+                await expect(paragraphs).toHaveCount(textBlocks.length);
+                assert.deepEqual(await paragraphs.allTextContents(), expectedText);
+                const allSpans = page.locator('.reader-body > p > span,.reader-body > h2 > span,.reader-body > h3 > span');
+                const runs = textBlocks.flatMap(block => block.runs);
+                await expect(allSpans).toHaveCount(runs.length);
+                for (let i = 0; i < runs.length; i++) {
+                  await expect(allSpans.nth(i)).toHaveText(runs[i].text, { useInnerText: false });
+                  if (runs[i].bold) assert(Number(await allSpans.nth(i).evaluate(node => getComputedStyle(node).fontWeight)) >= 700);
+                  if (runs[i].italic) await expect(allSpans.nth(i)).toHaveCSS('font-style', 'italic');
+                }
+                await noOverflow();
+                await page.screenshot({ path: `reports/${name}-release-diary.png`, fullPage: false });
+                await page.reload();
+                await expect(paragraphs).toHaveCount(textBlocks.length);
+                assert.deepEqual(await paragraphs.allTextContents(), expectedText);
+                await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
+                await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+                assert.deepEqual(await paragraphs.allTextContents(), expectedText);
+                for (const [route, heading] of [['relationships', 'Relationships'], ['shop', 'Shop']]) {
+                  await page.goto(`${origin}#/${route}`);
+                  await expect(page.locator('main h1')).toContainText(heading); await noOverflow();
+                }
+                await page.goto(origin);
+                await expect(page.locator('#hero-heading')).toBeVisible();
+                await expect(page.getByTestId('opening')).toHaveCount(0);
+                await page.getByRole('button', { name: 'Pause animation', exact: true }).click();
+                await expect(page.locator('html')).toHaveAttribute('data-motion', 'still');
+                await expect(lights).toHaveCSS('animation-name', 'none');
+                await page.getByRole('button', { name: 'Enable animation', exact: true }).click();
+                await expect(page.locator('html')).toHaveAttribute('data-motion', 'full');
+                await page.emulateMedia({ reducedMotion: 'reduce' });
+                await expect(lights).toHaveCSS('animation-name', 'none');
+                const accessibility = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+                assert.deepEqual(accessibility.violations, []);
+                assert.deepEqual(errors, []);
+                const result = { profile: name, status: 'passed', bodyDigest: digest(article.blocks), textBlocks: textBlocks.length, sourceCharacters: expectedText.join('').length, latestGoogleBody: true, opening: true, themeCopy: true, systemTheme: true, socialGrid: 11, artwork: true, gallery: true, fullscreen: true, refresh: true, preferences: true, motionControls: true, errors: 0, simulation: name.includes('iphone') || name.includes('android') };
+                results.push(result); console.log(JSON.stringify(result));
               } finally { await browser.close(); }
             }
+            await writeFile('reports/release-verification.json', JSON.stringify(results, null, 2));
           } finally { await api.dispose(); }
           VERIFY
       - name: Audit the live HTTPS site
