@@ -129,6 +129,8 @@ test('the redesigned character file remains accessible and responsive in both th
   for(const theme of ['light','dark'] as const){
     await page.getByTestId(`theme-${theme}`).click();
     await expectThemeColors(page,theme);
+    const foreground=theme==='dark'?'rgb(247, 240, 228)':'rgb(48, 43, 34)';
+    for(const label of await page.locator('.file-facts dd,.file-palette .color-label > span').all())await expect(label).toHaveCSS('color',foreground);
     const result=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(result.violations).toEqual([]);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   }
