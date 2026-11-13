@@ -10,8 +10,8 @@ export function ThemeCopy({ position, theme, language, className = '' }: { posit
   return <span className={`theme-copy ${className}`} data-copy-position={position}>
     <span className="sr-only" data-copy-current>{text}</span>
     {characterVariants(position).map(value => <span key={value} className="theme-copy-reserve" aria-hidden="true">{value}</span>)}
-    <span className="theme-copy-stage" aria-hidden="true"><AnimatePresence initial={false}>
-      <m.span className="theme-copy-ink" key={text} initial={enabled ? { opacity: 0, y: 3 } : false} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: enabled ? -2 : 0, position: 'absolute' }} transition={{ duration: enabled ? .3 : 0, ease: [.22, 1, .36, 1] }}>{text}</m.span>
-    </AnimatePresence></span>
+    <span className="theme-copy-stage" aria-hidden="true">{enabled ? <AnimatePresence initial={false}>
+      <m.span className="theme-copy-ink" key={text} initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -2, position: 'absolute' }} transition={{ duration: .3, ease: [.22, 1, .36, 1] }}>{text}</m.span>
+    </AnimatePresence> : <span className="theme-copy-ink">{text}</span>}</span>
   </span>;
 }
