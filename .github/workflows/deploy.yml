@@ -41,7 +41,20 @@ jobs:
           if (typeof credentials.client_email !== 'string' || !credentials.client_email.endsWith('.iam.gserviceaccount.com')) stop('SERVICE_ACCOUNT_EMAIL_MISSING_OR_INVALID');
           if (typeof credentials.private_key !== 'string') stop('SERVICE_ACCOUNT_PRIVATE_KEY_MISSING');
           try { createPrivateKey(credentials.private_key); } catch { stop('SERVICE_ACCOUNT_PRIVATE_KEY_INVALID'); }
-          if (!/^[\w-]{10,200}$/.test(env.GOOGLE_PUBLICATION_SHEET_ID || '')) stop('SHEET_ID_NOT_BARE_IDENTIFIER');
+          const originalSheet = env.GOOGLE_PUBLICATION_SHEET_ID || '';
+          const trimmedSheet = originalSheet.trim();
+          if (/^[\w-]{10,200}$/.test(trimmedSheet)) {
+            env.GOOGLE_PUBLICATION_SHEET_ID = trimmedSheet;
+            report({ stage, sheetFormat: originalSheet === trimmedSheet ? 'bare-id' : 'id-with-outer-whitespace' });
+          } else {
+            let link;
+            try { link = new URL(trimmedSheet); } catch { stop('SHEET_ID_NOT_IDENTIFIER_OR_URL'); }
+            const match = link.pathname.match(/^\/spreadsheets\/d\/([\w-]{10,200})(?:\/|$)/);
+            if (link.protocol !== 'https:' || link.hostname !== 'docs.google.com' || link.username || link.password || link.port || !match) stop('SHEET_URL_NOT_APPROVED_GOOGLE_SHEETS_LINK');
+            // Normalize only inside this read-only process. Never alter repository Secrets.
+            env.GOOGLE_PUBLICATION_SHEET_ID = match[1];
+            report({ stage, sheetFormat: 'full-google-sheets-url', normalizedInMemory: true });
+          }
           report({ stage, status: 'valid' });
           
           const reasons = new Set(['invalid_grant', 'invalid_client', 'unauthorized_client', 'access_denied', 'invalid_scope', 'PERMISSION_DENIED', 'NOT_FOUND', 'INVALID_ARGUMENT', 'UNAUTHENTICATED', 'FAILED_PRECONDITION', 'SERVICE_DISABLED', 'accessNotConfigured', 'forbidden', 'notFound', 'badRequest', 'insufficientPermissions', 'SERVICE_USAGE_DENIED']);
