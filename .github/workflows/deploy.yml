@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
-          ref: main
+          ref: fix/release-motion-loading
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
@@ -67,7 +67,7 @@ jobs:
               const text = (paragraph.elements || []).map(element => element.textRun?.content || '').join('');
               return text.trim() && text.trim() !== '---';
             });
-            const originalRuns = nonempty.flatMap(paragraph => (paragraph.elements || []).filter(element => element.textRun).map(element => ({
+            const originalRuns = paragraphs.flatMap(paragraph => (paragraph.elements || []).filter(element => element.textRun).map(element => ({
               text: element.textRun.content || '',
               ...(element.textRun.textStyle?.bold ? { bold: true } : {}),
               ...(element.textRun.textStyle?.italic ? { italic: true } : {}),
