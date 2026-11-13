@@ -1,99 +1,97 @@
 name: Test and deploy LongDay to GitHub Pages
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
-  schedule:
-    - cron: '17,47 * * * *'
-
 permissions:
   contents: read
-
-concurrency:
-  group: longday-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  verify:
-    if: github.event_name != 'schedule' || vars.GOOGLE_SYNC_ENABLED == 'true'
+  diagnose:
+    if: github.ref == 'refs/heads/diagnostics/google-publication' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
-    # Opening scenarios now wait for the full presentation instead of dismissing
-    # it. Allow aggregate runner time; individual test and audit gates stay unchanged.
-    timeout-minutes: 35
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: npm
       - run: npm ci
       - run: npm test
-      - name: Sync explicitly published Google content
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.GOOGLE_SYNC_ENABLED == 'true'
+      - name: Diagnose published-only Google sync without deploying
         env:
-          GOOGLE_SYNC_ENABLED: 'true'
+          GOOGLE_SYNC_ENABLED: ${{ vars.GOOGLE_SYNC_ENABLED }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           GOOGLE_PUBLICATION_SHEET_ID: ${{ secrets.GOOGLE_PUBLICATION_SHEET_ID }}
           GOOGLE_RELATIONSHIP_FOLDER_ID: ${{ secrets.GOOGLE_RELATIONSHIP_FOLDER_ID }}
           GOOGLE_ALLOW_EMPTY_PUBLICATION: ${{ vars.GOOGLE_ALLOW_EMPTY_PUBLICATION }}
-        run: node scripts/google-sync.mjs
-      - name: TypeScript and production build
-        id: build
-        run: npm run build
-      - name: Install browser test engines
-        run: npx playwright install --with-deps chromium firefox webkit
-      # Audit before the long browser suite for faster performance feedback.
-      # Every browser assertion still runs even if the audit fails; either failure blocks deployment.
-      - name: Audit mobile and desktop performance
-        if: success() || (failure() && steps.build.outcome == 'success')
-        run: npm run audit
-      # Xvfb supplies the Linux WebKit display backend; all assertions remain active.
-      - name: Test desktop, mobile, preferences, music, links and accessibility
-        if: success() || (failure() && steps.build.outcome == 'success')
-        run: xvfb-run -a npm run test:e2e -- --headed
-      - name: Upload verification evidence
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: verification-${{ github.sha }}
-          path: |
-            reports/
-            playwright-report/
-            test-results/
-          retention-days: 30
-      - name: Upload production site
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-  deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: verify
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-      - name: Deploy production artifact
-        id: deployment
-        uses: actions/deploy-pages@v4
-      - name: Verify published HTML
-        env:
-          PAGES_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
-          for attempt in 1 2 3 4 5 6; do
-            if curl --fail --silent --show-error --location "$PAGES_URL" --output /tmp/longday-page.html && grep -q 'LongDay' /tmp/longday-page.html; then
-              echo "Verified $PAGES_URL" >> "$GITHUB_STEP_SUMMARY"
-              exit 0
-            fi
-            sleep 10
-          done
-          exit 1
+          node --input-type=module <<'DIAGNOSTIC'
+          import { createPrivateKey } from 'node:crypto';
+          
+          let stage = 'configuration';
+          const report = value => console.log(JSON.stringify(value));
+          const stop = reason => { report({ status: 'failed', stage, reason }); process.exit(1); };
+          const env = process.env;
+          report({ stage, enabled: env.GOOGLE_SYNC_ENABLED === 'true', credentialsPresent: !!env.GOOGLE_SERVICE_ACCOUNT_JSON, sheetPresent: !!env.GOOGLE_PUBLICATION_SHEET_ID });
+          if (env.GOOGLE_SYNC_ENABLED !== 'true') stop('SYNC_DISABLED');
+          let credentials;
+          try { credentials = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_JSON || '{}'); } catch { stop('SERVICE_ACCOUNT_NOT_VALID_JSON'); }
+          if (!credentials || typeof credentials !== 'object' || Array.isArray(credentials)) stop('SERVICE_ACCOUNT_NOT_AN_OBJECT');
+          if (typeof credentials.client_email !== 'string' || !credentials.client_email.endsWith('.iam.gserviceaccount.com')) stop('SERVICE_ACCOUNT_EMAIL_MISSING_OR_INVALID');
+          if (typeof credentials.private_key !== 'string') stop('SERVICE_ACCOUNT_PRIVATE_KEY_MISSING');
+          try { createPrivateKey(credentials.private_key); } catch { stop('SERVICE_ACCOUNT_PRIVATE_KEY_INVALID'); }
+          if (!/^[\w-]{10,200}$/.test(env.GOOGLE_PUBLICATION_SHEET_ID || '')) stop('SHEET_ID_NOT_BARE_IDENTIFIER');
+          report({ stage, status: 'valid' });
+          
+          const reasons = new Set(['invalid_grant', 'invalid_client', 'unauthorized_client', 'access_denied', 'invalid_scope', 'PERMISSION_DENIED', 'NOT_FOUND', 'INVALID_ARGUMENT', 'UNAUTHENTICATED', 'FAILED_PRECONDITION', 'SERVICE_DISABLED', 'accessNotConfigured', 'forbidden', 'notFound', 'badRequest', 'insufficientPermissions', 'SERVICE_USAGE_DENIED']);
+          const request = async (url, options) => {
+            const host = new URL(url).hostname;
+            stage = host === 'oauth2.googleapis.com' ? 'google-authentication' : host === 'sheets.googleapis.com' ? 'google-sheets' : host === 'docs.googleapis.com' ? 'google-docs' : host.endsWith('googleusercontent.com') ? 'document-image' : 'google-drive';
+            const response = await fetch(url, options);
+            report({ stage, http: response.status });
+            if (!response.ok && ![301,302,303,307,308].includes(response.status)) {
+              try {
+                const data = await response.clone().json();
+                const candidates = typeof data.error === 'string' ? [data.error] : [data.error?.status, ...(data.error?.errors || []).map(e => e.reason), ...(data.error?.details || []).map(e => e.reason)];
+                report({ stage, apiReasons: candidates.filter(x => reasons.has(x)) });
+              } catch { /* Never emit API response text, descriptions, URLs or identifiers. */ }
+            }
+            if (stage === 'google-sheets' && response.ok) {
+              const data = await response.clone().json();
+              const values = data.valueRanges?.[0]?.values || [];
+              const [headers = [], ...rows] = values;
+              const row = rows.map(values => Object.fromEntries(headers.map((h,i) => [h,String(values[i] ?? '').trim()]))).find(r => r.id === 'diary-01');
+              report({ stage: 'article-row-check', found: !!row, ...(row ? { titleMatches: row.title === '台灣', kindMatches: row.kind === 'diary', published: row.publishStatus === 'published', dateValid: /^\d{4}-\d{2}-\d{2}$/.test(row.date || ''), dateNotFuture: !!row.date && row.date <= new Date().toISOString().slice(0,10), docIdValid: /^[\w-]{10,200}$/.test(row.docId || ''), tabSpecified: !!row.tabId } : {}) });
+            }
+            if (stage === 'google-docs' && response.ok) {
+              const document = await response.clone().json();
+              const count = tabs => tabs.reduce((n,t) => n + 1 + count(t.childTabs || []), 0);
+              report({ stage: 'document-structure', tabCount: count(document.tabs || []) });
+            }
+            return response;
+          };
+          
+          try {
+            const { sync } = await import('./scripts/google-sync.mjs');
+            report(await sync({ request }));
+          } catch (error) {
+            const known = new Map([
+              ['Invalid Google identifier in publication configuration','INVALID_GOOGLE_IDENTIFIER'],
+              ['Both Articles and Products sheets are required','ARTICLES_AND_PRODUCTS_REQUIRED'],
+              ['Duplicate Sheet column','DUPLICATE_COLUMN'],
+              ['Published article requires date, title and kind','PUBLISHED_ARTICLE_FIELDS_INVALID'],
+              ['Multiple document tabs: choose the published tabId explicitly','TAB_SELECTION_REQUIRED'],
+              ['Published document tab not found','TAB_NOT_FOUND'],
+              ['Unsupported document structure: use paragraphs, headings and inline images, not tables','UNSUPPORTED_TABLE_OR_STRUCTURE'],
+              ['Floating images must be changed to inline before publication','FLOATING_IMAGE_NOT_INLINE'],
+              ['Unsupported embedded object; use an inline image','UNSUPPORTED_EMBEDDED_OBJECT'],
+              ['Unsupported paragraph element; publication stopped without replacing the live site','UNSUPPORTED_PARAGRAPH_ELEMENT'],
+              ['Refusing to publish an empty document','EMPTY_DOCUMENT'],
+              ['Invalid article','ARTICLE_SCHEMA_INVALID'],
+              ['Invalid ID','ARTICLE_OR_PRODUCT_ID_INVALID'],
+              ['Empty publication refused; explicit GOOGLE_ALLOW_EMPTY_PUBLICATION is required','EMPTY_PUBLICATION_REFUSED']
+            ]);
+            stop(known.get(error?.message) || 'SYNC_ERROR_DETAILS_WITHHELD');
+          }
+          DIAGNOSTIC
