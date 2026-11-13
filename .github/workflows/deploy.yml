@@ -13,7 +13,9 @@ permissions:
 
 concurrency:
   group: longday-${{ github.ref }}
-  cancel-in-progress: true
+  # A scheduled refresh must queue behind a complete publication, not cancel
+  # it every 30 minutes. New code and explicit manual runs still supersede it.
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 jobs:
   verify:
