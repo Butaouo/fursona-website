@@ -7,14 +7,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 // @ts-expect-error The server-only sync is plain ESM and never bundled into the website.
-import { parseDocument, published, rows, safeImageUrl, selectTab, sync } from '../scripts/google-sync.mjs';
+import { parseDocument, publicationSheetId, published, rows, safeImageUrl, selectTab, sync } from '../scripts/google-sync.mjs';
 describe('static content and navigation',()=>{
   it('accepts honest empty content and rejects remote media',()=>{expect(readCatalog(emptyCatalog)).toEqual(emptyCatalog);expect(safeMedia('https://drive.google.com/private')).toBe(false);expect(safeMedia('content/media/../secret.png')).toBe(false);expect(safeMedia('content/media/abc.webp')).toBe(true);expect(()=>readCatalog({...emptyCatalog,relationship:{src:'javascript:alert(1)',alt:{'zh-TW':'x'}}})).toThrow();});
   it('preserves legacy anchors and direct hash subpages',()=>{expect(routeFromHash('#connect')).toBe('');expect(routeFromHash('#fursona')).toBe('about');expect(routeFromHash('#/about')).toBe('about');expect(routeFromHash('#/archive/chapter-1')).toBe('archive/chapter-1');expect(routeFromHash('#/shop/')).toBe('shop');});
   it('falls back honestly to original text',()=>{expect(localized({'zh-TW':'原文'},'en')).toBe('原文');});
 });
 describe('Google publication security and document ordering',()=>{
-  it('publishes a complete mocked Docs/Drive/Sheets snapshot without leaking drafts or credentials',async()=>{
+  it.each(['fixture-sheet-id','https://docs.google.com/spreadsheets/d/fixture-sheet-id/edit?usp=sharing'])('publishes a complete snapshot for a Sheet ID or share link without leaking drafts or credentials (%s)',async(sheetSource)=>{
     const output=await mkdtemp(join(tmpdir(),'longday-complete-sync-'));
     const {privateKey}=generateKeyPairSync('rsa',{modulusLength:2048});
     const credentials={client_email:'test@example.iam.gserviceaccount.com',private_key:privateKey.export({type:'pkcs8',format:'pem'})};
@@ -28,14 +28,14 @@ describe('Google publication security and document ordering',()=>{
         return new Response(new Uint8Array(bytes));
       }
       expect(options.headers?.Authorization).toBe('Bearer fixture-secret-token');
-      if(url.includes('sheets.googleapis.com'))return Response.json({valueRanges:[{values:[['id','kind','title','date','docId','publishStatus'],['chapter-1','novel','測試文章','2020-01-01','published-document','published'],['private','diary','PRIVATE DRAFT','2020-01-01','private-document','draft']]},{values:[['id','name','imageDriveId','publishStatus','detailImageDriveIds'],['item-1','測試商品','product-image-id','published','detail-image-one,detail-image-two']]}]});
+      if(url.includes('sheets.googleapis.com')){expect(url).toContain('/spreadsheets/fixture-sheet-id/values:batchGet');return Response.json({valueRanges:[{values:[['id','kind','title','date','docId','publishStatus'],['chapter-1','novel','測試文章','2020-01-01','published-document','published'],['private','diary','PRIVATE DRAFT','2020-01-01','private-document','draft']]},{values:[['id','name','imageDriveId','publishStatus','detailImageDriveIds'],['item-1','測試商品','product-image-id','published','detail-image-one,detail-image-two']]}]});}
       if(url.includes('docs.googleapis.com'))return Response.json({body:{content:[{paragraph:{elements:[{textRun:{content:'Before'}},{inlineObjectElement:{inlineObjectId:'image'}},{textRun:{content:'After'}}]}}]},inlineObjects:{image:{inlineObjectProperties:{embeddedObject:{title:'Caption',imageProperties:{contentUri:'https://lh3.googleusercontent.com/fixture'}}}}}});
       if(url.includes('?q='))return Response.json({files:[{id:'relationship-image-id',name:'relationships-published.png'}]});
       if(url.includes('alt=media'))return new Response(new Uint8Array(bytes));
       throw new Error('Unexpected request');
     };
     try{
-      const result=await sync({env:{GOOGLE_SYNC_ENABLED:'true',GOOGLE_SERVICE_ACCOUNT_JSON:JSON.stringify(credentials),GOOGLE_PUBLICATION_SHEET_ID:'fixture-sheet-id',GOOGLE_RELATIONSHIP_FOLDER_ID:'fixture-folder-id'},request,output});
+      const result=await sync({env:{GOOGLE_SYNC_ENABLED:'true',GOOGLE_SERVICE_ACCOUNT_JSON:JSON.stringify(credentials),GOOGLE_PUBLICATION_SHEET_ID:sheetSource,GOOGLE_RELATIONSHIP_FOLDER_ID:'fixture-folder-id'},request,output});
       expect(result).toEqual({status:'published',articles:1,products:1,relationship:true});
       const raw=await readFile(join(output,'catalog.json'),'utf8');
       const catalog=readCatalog(JSON.parse(raw));
@@ -48,6 +48,12 @@ describe('Google publication security and document ordering',()=>{
       const metadata=await sharp(localImage).metadata();
       expect(metadata.format).toBe('webp');expect(metadata.width).toBe(8);expect(metadata.height).toBe(12);
     }finally{await rm(output,{recursive:true,force:true});}
+  });
+  it('normalizes only Sheet IDs and approved HTTPS Google Sheets links',()=>{
+    for(const source of ['fixture-sheet-id','  fixture-sheet-id\n','https://docs.google.com/spreadsheets/d/fixture-sheet-id','https://docs.google.com/spreadsheets/d/fixture-sheet-id/edit?usp=drivesdk#gid=0'])expect(publicationSheetId(source)).toBe('fixture-sheet-id');
+  });
+  it('rejects unsafe or unrelated links without echoing input in errors',()=>{
+    for(const source of [undefined,'','https://evil.example/spreadsheets/d/fixture-sheet-id','http://docs.google.com/spreadsheets/d/fixture-sheet-id','https://docs.google.com.evil.example/spreadsheets/d/fixture-sheet-id','https://private:credential@docs.google.com/spreadsheets/d/fixture-sheet-id','https://docs.google.com:444/spreadsheets/d/fixture-sheet-id','https://docs.google.com/document/d/fixture-sheet-id','https://docs.google.com/spreadsheets/d/tiny','https://docs.google.com/spreadsheets/d/fixture-sheet-id%2Fother'])expect(()=>publicationSheetId(source)).toThrow('Invalid publication Sheet ID or Google Sheets URL');
   });
   it('never publishes drafts or future releases',()=>{expect(published({publishStatus:'draft'})).toBe(false);expect(published({publishStatus:'published',date:'2099-01-01'})).toBe(false);expect(published({publishStatus:'published',date:'2020-01-01'})).toBe(true);});
   it('maps sheet headers without including empty rows',()=>{expect(rows([['id','publishStatus'],['story','draft'],[]])).toEqual([{id:'story',publishStatus:'draft'}]);expect(()=>rows([['id','id']])).toThrow();});
