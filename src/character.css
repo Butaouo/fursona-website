@@ -2,7 +2,7 @@
 .theme-copy{position:relative;display:grid;grid-template-areas:"copy";min-width:0;white-space:pre-wrap}
 .theme-copy-reserve,.theme-copy-stage{grid-area:copy;min-width:0}
 .theme-copy-reserve{visibility:hidden;pointer-events:none;user-select:none}
-.theme-copy-stage{position:relative;align-self:center}.theme-copy-ink{display:block;width:100%}
+.theme-copy-stage{position:absolute;inset:0;display:grid;align-items:center}.theme-copy-ink{display:block;width:100%}
 .hero-copy>.eyebrow{margin-bottom:25px}.hero-tagline{font-family:"Iowan Old Style","Noto Serif TC","Songti TC","PMingLiU",serif;color:var(--accent);font-size:23px;letter-spacing:.035em;line-height:1.8;min-height:3.6em}
 .hero-actions{margin-top:17px}.art-caption{gap:10px}.art-caption>.theme-copy{flex:1;min-width:0;white-space:nowrap;font-size:10px;line-height:1.5}
 .art-caption .theme-copy-reserve,.art-caption .theme-copy-ink{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
