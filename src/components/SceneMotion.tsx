@@ -59,12 +59,18 @@ export function SceneMotion({ children, enabled }: PropsWithChildren<{ enabled: 
     const observer = new IntersectionObserver(entries => entries.forEach(entry => {
       if (entry.isIntersecting) { (entry.target as HTMLElement).dataset.revealed = 'true'; observer.unobserve(entry.target); }
     }), { threshold: 0, rootMargin: '0px 0px -6% 0px' });
-    const collect = () => root.querySelectorAll<HTMLElement>(selector).forEach(el => {
-      if (elements.has(el)) return;
-      elements.add(el); el.classList.add('scene-reveal');
-      if (el.getBoundingClientRect().top < innerHeight * .94) el.dataset.revealed = 'true';
-      else observer.observe(el);
-    });
+    const collect = () => {
+      const added = Array.from(root.querySelectorAll<HTMLElement>(selector)).filter(el => !elements.has(el));
+      // Read positions together before writing reveal classes. Interleaved
+      // writes/measurements otherwise force a layout for each new reader block.
+      const edge = innerHeight * .94;
+      const visible = added.map(el => el.getBoundingClientRect().top < edge);
+      added.forEach((el, index) => {
+        elements.add(el); el.classList.add('scene-reveal');
+        if (visible[index]) el.dataset.revealed = 'true';
+        else observer.observe(el);
+      });
+    };
     collect(); const mutations = new MutationObserver(collect); mutations.observe(root, { childList: true, subtree: true });
     return () => { observer.disconnect(); mutations.disconnect(); elements.forEach(el => { el.classList.remove('scene-reveal'); delete el.dataset.revealed; }); };
   }, [enabled]);
