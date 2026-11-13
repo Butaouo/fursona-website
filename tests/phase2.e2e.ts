@@ -18,7 +18,7 @@ test.afterEach(async ({ page }, info) => {
 // Each deep-link/refresh is an independent acceptance case. Keep every original
 // assertion and the default deadlines instead of sharing one 30s budget across
 // eight full loads plus history and a language transition on software WebKit.
-for (const [route,title] of Object.entries({archive:'創作',relationships:'關係網',shop:'商品',about:'設定'})) {
+for (const [route,title] of Object.entries({archive:'創作',relationships:'關係網',shop:'商品',about:'久天'})) {
   test(`${route} opens directly and survives refresh without horizontal overflow`,async({page})=>{
     await page.goto(`./#/${route}`);
     await expect(page.locator('main h1')).toContainText(title);
@@ -30,7 +30,7 @@ for (const [route,title] of Object.entries({archive:'創作',relationships:'關�
 test('navigation history and language switching preserve the current route',async({page})=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('./#/about');
-  await expect(page.locator('main h1')).toContainText('設定');
+  await expect(page.locator('main h1')).toContainText('久天');
   await page.getByRole('link',{name:'商品',exact:true}).click();
   await expect(page).toHaveURL(/#\/shop$/);
   await expect(page.locator('main h1')).toContainText('商品');
@@ -39,7 +39,7 @@ test('navigation history and language switching preserve the current route',asyn
   await expect(page).toHaveURL(/#\/shop$/);
   await page.goBack();
   await expect(page).toHaveURL(/#\/about$/);
-  await expect(page.locator('main h1')).toContainText('Character');
+  await expect(page.locator('main h1')).toContainText('LongDay');
   expect(errors).toEqual([]);
 });
 test('reader keeps text and illustrations ordered, supports chapters and safe zoom',async({page})=>{await page.goto('./#/archive/test-story');await expect(page.locator('.reader-body>p').first()).toContainText('<script>alert(1)</script>');expect(await page.locator('.reader-body').evaluate(el=>[...el.children].map(x=>x.tagName).slice(0,4))).toEqual(['H2','P','FIGURE','P']);await page.getByRole('button',{name:'放大: 測試插畫',exact:true}).click();await expect(page.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).not.toBeVisible();await page.getByRole('link',{name:/下一章/}).click();await expect(page).toHaveURL(/test-story-2$/);await expect(page.getByRole('link',{name:/上一章/})).toBeVisible();});

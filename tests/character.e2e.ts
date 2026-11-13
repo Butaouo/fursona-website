@@ -15,7 +15,7 @@ test('a hash changed during initial subscription cannot leave the homepage behin
   });
   await page.goto('./');
   await expect(page).toHaveURL(/#\/about$/);
-  await expect(page.locator('main h1')).toContainText('設定');
+  await expect(page.locator('main h1')).toContainText('久天');
   await expect(page.getByRole('tab', { name: '毛色設定', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: '設定', exact: true })).toHaveAttribute('aria-current', 'page');
 });
@@ -28,25 +28,25 @@ test('home stays focused while Character retains references, translations and me
   await expect(page.locator('.fursona-section,.character-notes,[role="tablist"]')).toHaveCount(0);
   await expect(page.getByRole('link', { name: '設定', exact: true })).toHaveAttribute('href', '#/about');
   await expect(page.getByRole('link', { name: '關於', exact: true })).toHaveCount(0);
-  await page.getByRole('link', { name: '認識久天', exact: true }).click();
+  await page.getByRole('link', { name: '角色設定', exact: true }).click();
   await expect(page).toHaveURL(/#\/about$/);
-  await expect(page.locator('main h1')).toContainText('設定');
+  await expect(page.locator('main h1')).toContainText('久天');
   await expect(page).toHaveTitle('設定 · LongDay');
   await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /角色設定/);
   await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', '設定 · LongDay');
   // Independent reads share one wait phase; no assertion or timeout is removed.
   await Promise.all([
     ...['穿衣設定', '毛色設定', '角色插畫'].map(label => expect(page.getByRole('tab', { name: label, exact: true })).toBeVisible()),
-    ...['哈古久天', '貓狐', '沉穩 · 可愛 · 傲嬌'].map(text => expect(page.locator('.character-notes')).toContainText(text)),
+    ...['哈古久天', '狐貓型獸人', '沉穩 · 可愛 · 傲嬌', '希望日落能停留得更久'].map(text => expect(page.locator('.character-notes')).toContainText(text)),
   ]);
   await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
   await expect(page.getByRole('link', { name: 'Character', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('link', { name: 'About', exact: true })).toHaveCount(0);
-  await expect(page.locator('main h1')).toContainText('Character');
+  await expect(page.locator('main h1')).toContainText('LongDay');
   await expect(page).toHaveTitle('Character · LongDay');
   await expect(page.locator('meta[name="twitter:title"]')).toHaveAttribute('content', 'Character · LongDay');
   await page.reload();
-  await expect(page.locator('main h1')).toContainText('Character');
+  await expect(page.locator('main h1')).toContainText('LongDay');
   await expect(page).toHaveURL(/#\/about$/);
 });
 
@@ -58,7 +58,7 @@ test('legacy Character links and returning home preserve the focused homepage', 
     sessionStorage.setItem('longday:opening', 'seen');
   });
   await page.goto('./#fursona');
-  await expect(page.locator('main h1')).toContainText('Character');
+  await expect(page.locator('main h1')).toContainText('LongDay');
   await expect(page.locator('.fursona-section')).toHaveCount(1);
   await expect(page.locator('.content-heading h1 .animated-label')).toHaveClass(/label-idle/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

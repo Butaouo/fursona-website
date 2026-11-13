@@ -113,7 +113,7 @@ test('stalled images hit the bounded escape hatch instead of trapping the visito
     await started(page);
     await finished(page);
     await page.getByRole('link', { name: '設定', exact: true }).click();
-    await expect(page.locator('main h1')).toContainText('設定');
+    await expect(page.locator('main h1')).toContainText('久天');
   } finally { image.release(); }
 });
 
@@ -167,7 +167,7 @@ test('a warm fresh tab plays once and returning home does not replay it', async 
     }
     await warm.goto(baseURL!, { waitUntil: 'domcontentloaded' }); await started(warm);
     await finished(warm);
-    await warm.getByRole('link', { name: '設定', exact: true }).click(); await expect(warm.locator('main h1')).toContainText('設定');
+    await warm.getByRole('link', { name: '設定', exact: true }).click(); await expect(warm.locator('main h1')).toContainText('久天');
     await warm.getByRole('link', { name: '首頁', exact: true }).click(); await expect(warm.locator('#hero-heading')).toBeVisible();
     await expect(warm.getByTestId('opening')).toHaveCount(0);
     await info.attach('network-and-cache', { body: JSON.stringify({ network: browserName === 'chromium' ? ['4G: 1.6 Mbps / 150ms', 'slower: 500 kbps / 400ms'] : 'engine defaults; delayed critical resources are tested separately', resources: await warm.evaluate(() => performance.getEntriesByType('resource').map(entry => ({ name: entry.name, transferSize: (entry as PerformanceResourceTiming).transferSize }))) }), contentType: 'application/json' });
