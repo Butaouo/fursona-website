@@ -215,6 +215,10 @@ jobs:
             }
           } finally { await api.dispose(); }
           VERIFY
+      - name: Audit the live HTTPS site
+        env:
+          AUDIT_URL: https://longday.tw/
+        run: node scripts/lighthouse.mjs
       - name: Upload production verification screenshots
         if: always()
         uses: actions/upload-artifact@v6
