@@ -14,6 +14,9 @@ test('original social grid exposes all eleven platforms without an expander', as
 });
 
 test('home quotes follow manual themes without changing the frame or replaying the opening', async ({ page }, info) => {
+  // Two full-page captures on software-rendered WebKit need their own total
+  // scenario budget. Assertion deadlines and all visual thresholds stay intact.
+  test.setTimeout(60000);
   await page.goto('./');
   await expect(page.locator('.hero-image')).toBeVisible();
   await expect(page.getByTestId('opening')).toHaveCount(0,{timeout:19000});
@@ -40,6 +43,8 @@ test('home quotes follow manual themes without changing the frame or replaying t
 });
 
 test('character narration changes with the theme while objective data stays unchanged', async ({ page }, info) => {
+  // Preserve both full-page theme captures without timing out during capture.
+  test.setTimeout(60000);
   await page.goto('./#/about');
   await expect(page.locator('main h1')).toContainText('久天');
   await expect(page.getByTestId('opening')).toHaveCount(0,{timeout:19000});
