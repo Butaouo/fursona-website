@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
-          ref: 57a79a83525902d980e2c1aa1c9fbf7f9ff3e645
+          ref: main
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
@@ -79,7 +79,7 @@ jobs:
             assert(liveResponse.ok);
             const live = (await liveResponse.json()).articles.find(value => value.id === 'diary-01');
             const proof = {
-              status: 'verified', fetchedAt: new Date().toISOString(), id: 'diary-01',
+              ...result, status: 'verified', fetchedAt: new Date().toISOString(), id: 'diary-01',
               published: row.publishStatus === 'published', freshDocumentRequests: documentRequests,
               sourceCharacters: sourceText.length, sourceParagraphs: nonempty.length,
               sourceLineBreaks: (sourceText.match(/\n/g) || []).length,
@@ -87,8 +87,7 @@ jobs:
               sourceTextDigest: digest(sourceText), formattingDigest: digest(originalRuns),
               bodyDigest: digest(article.blocks), liveBodyDigest: live ? digest(live.blocks) : null,
               liveMatchesFreshGoogle: !!live && digest(live.blocks) === digest(article.blocks),
-              ...result,
-            };
+              };
             await mkdir('reports', { recursive: true });
             await writeFile('reports/google-diary-proof.json', JSON.stringify(proof, null, 2));
             console.log(JSON.stringify(proof));
