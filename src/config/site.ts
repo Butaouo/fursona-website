@@ -11,7 +11,8 @@ export const site = {
   person: {
     name: { 'zh-TW': '久天', en: 'LongDay' },
     fullName: { 'zh-TW': '哈古久天', en: 'Lyont HaGoo LongDay' },
-    species: { 'zh-TW': '貓狐', en: 'Cat × Fox' },
+    species: { 'zh-TW': '狐貓型獸人', en: 'Feline–Vulpine' },
+    nameMeaning: { 'zh-TW': '希望日落能停留得更久', en: 'A wish for the sunset to linger longer' },
     intro: { 'zh-TW': '我是哈古久天、叫我久天就行！', en: 'I’m HaGoo LongDay. Just call me LongDay!' },
     tagline: { 'zh-TW': '日落，予你。', en: 'A little warmth for everyone I meet.' },
     traits: { 'zh-TW': ['沉穩', '可愛', '傲嬌'], en: ['Calm', 'Cute', 'A little tsundere'] },
