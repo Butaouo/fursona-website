@@ -14,10 +14,12 @@ Google Docs → GitHub Actions（伺服器端唯讀同步、圖片轉存與驗�
 2. 建立專用 Service Account，不授予 Cloud 專案管理員、不啟用全網域委派。建立 JSON 金鑰並保存在你自己的裝置上。只有這個網站的同步服務使用它；之後可改成 Workload Identity Federation 免長效金鑰。
 3. 在 Drive 建立專用「LongDay 發布」資料夾，內含發布用 Docs、圖片與下述 Sheet；只將這個資料夾以「檢視者」分享給 Service Account 的 email。不要公開整個 Drive，也不要把私人文件搬入此資料夾。資料夾內檔案會繼承該唯讀權限。
 4. 建立 Google Sheet，兩個工作表必須命名為 `Articles` 與 `Products`，第一列使用下表欄名。可先只填標題列。
-5. 到本專案 **Settings → Secrets and variables → Actions**，新增 Repository secrets：`GOOGLE_SERVICE_ACCOUNT_JSON`（完整 JSON，只貼在 GitHub 的 Secret 表單）、`GOOGLE_PUBLICATION_SHEET_ID`（Sheet 網址 `/d/` 與 `/edit` 之間的 ID）。若要關係圖同步，另設 `GOOGLE_RELATIONSHIP_FOLDER_ID`，指向專用圖檔資料夾。
+5. 到本專案 **Settings → Secrets and variables → Actions**，新增 Repository secrets：`GOOGLE_SERVICE_ACCOUNT_JSON`（完整 JSON，只貼在 GitHub 的 Secret 表單）、`GOOGLE_PUBLICATION_SHEET_ID`（Sheet 的純 ID，或完整的 `https://docs.google.com/spreadsheets/d/...` 分享網址）。同步程式會在執行時擷取並驗證 Sheet ID，不修改儲存的 Secret，也不在日誌顯示來源網址或 ID。此相容處理只適用於發布索引 Sheet；Articles 的 `docId` 仍填純文件 ID。若要關係圖同步，另設 `GOOGLE_RELATIONSHIP_FOLDER_ID`，指向專用圖檔資料夾。
 6. 至少準備一筆正式發布內容後，新增 Repository variable `GOOGLE_SYNC_ENABLED=true`，在 **Actions → Test and deploy LongDay to GitHub Pages → Run workflow** 執行一次。成功後每小時第 17、47 分自動檢查；GitHub 排程可能延遲，實際更新還需等待完整測試與部署，不是即時。
 
 若目前完全沒有內容但要驗證連線，另外設 `GOOGLE_ALLOW_EMPTY_PUBLICATION=true` 明確允許空白發布；確認完成後移除此旗標。若曾發布過內容，不要隨意關閉 `GOOGLE_SYNC_ENABLED` 後重新部署，因為 Repository 的初始 catalog 是空白；要暫停發文，保留現有 published 列，停止修改即可。
+
+若 Actions 顯示成功但文章沒有更新，先檢查 `Sync explicitly published Google content` 的步驟結果。`Skipped` 表示尚未執行 Google 同步，不能據此判定文件或 Service Account 權限正確。`GOOGLE_SYNC_ENABLED` 必須是 **Repository variable**，名稱完全一致、值為小寫 `true`；同名 Secret 不會滿足啟用條件。日記發布後位於「創作 → 日記」，小說與日記使用各自的分類。
 
 ## Articles 欄位（A～N）
 
