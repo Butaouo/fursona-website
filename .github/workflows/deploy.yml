@@ -18,14 +18,13 @@ jobs:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
-          ref: 74232fd1b40eb23159a725aac5821ae4ab790270
+          ref: 57a79a83525902d980e2c1aa1c9fbf7f9ff3e645
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - run: npm test
-      - name: Diagnose published-only Google sync without deploying
+      - name: Verify fresh published Google diary without deploying
         env:
           GOOGLE_SYNC_ENABLED: ${{ vars.GOOGLE_SYNC_ENABLED }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
@@ -33,89 +32,78 @@ jobs:
           GOOGLE_RELATIONSHIP_FOLDER_ID: ${{ secrets.GOOGLE_RELATIONSHIP_FOLDER_ID }}
           GOOGLE_ALLOW_EMPTY_PUBLICATION: ${{ vars.GOOGLE_ALLOW_EMPTY_PUBLICATION }}
         run: |
-          node --input-type=module <<'DIAGNOSTIC'
-          import { createPrivateKey } from 'node:crypto';
+          node --input-type=module <<'VERIFY'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { mkdir, readFile, writeFile } from 'node:fs/promises';
+          import { sync, rows, selectTab, published } from './scripts/google-sync.mjs';
           
-          let stage = 'configuration';
-          const report = value => console.log(JSON.stringify(value));
-          const stop = reason => { report({ status: 'failed', stage, reason }); process.exit(1); };
-          const env = process.env;
-          report({ stage, enabled: env.GOOGLE_SYNC_ENABLED === 'true', credentialsPresent: !!env.GOOGLE_SERVICE_ACCOUNT_JSON, sheetPresent: !!env.GOOGLE_PUBLICATION_SHEET_ID });
-          if (env.GOOGLE_SYNC_ENABLED !== 'true') stop('SYNC_DISABLED');
-          let credentials;
-          try { credentials = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_JSON || '{}'); } catch { stop('SERVICE_ACCOUNT_NOT_VALID_JSON'); }
-          if (!credentials || typeof credentials !== 'object' || Array.isArray(credentials)) stop('SERVICE_ACCOUNT_NOT_AN_OBJECT');
-          if (typeof credentials.client_email !== 'string' || !credentials.client_email.endsWith('.iam.gserviceaccount.com')) stop('SERVICE_ACCOUNT_EMAIL_MISSING_OR_INVALID');
-          if (typeof credentials.private_key !== 'string') stop('SERVICE_ACCOUNT_PRIVATE_KEY_MISSING');
-          try { createPrivateKey(credentials.private_key); } catch { stop('SERVICE_ACCOUNT_PRIVATE_KEY_INVALID'); }
-          const originalSheet = env.GOOGLE_PUBLICATION_SHEET_ID || '';
-          const trimmedSheet = originalSheet.trim();
-          if (/^[\w-]{10,200}$/.test(trimmedSheet)) {
-            // Keep the original environment value; the checked-out sync must normalize it.
-            report({ stage, sheetFormat: originalSheet === trimmedSheet ? 'bare-id' : 'id-with-outer-whitespace' });
-          } else {
-            let link;
-            try { link = new URL(trimmedSheet); } catch { stop('SHEET_ID_NOT_IDENTIFIER_OR_URL'); }
-            const match = link.pathname.match(/^\/spreadsheets\/d\/([\w-]{10,200})(?:\/|$)/);
-            if (link.protocol !== 'https:' || link.hostname !== 'docs.google.com' || link.username || link.password || link.port || !match) stop('SHEET_URL_NOT_APPROVED_GOOGLE_SHEETS_LINK');
-            // Normalize only inside this read-only process. Never alter repository Secrets.
-            // Keep the original environment value; the checked-out sync must normalize it.
-            report({ stage, sheetFormat: 'full-google-sheets-url', normalizationDelegatedToCheckedOutSync: true });
-          }
-          report({ stage, status: 'valid' });
-          
-          const reasons = new Set(['invalid_grant', 'invalid_client', 'unauthorized_client', 'access_denied', 'invalid_scope', 'PERMISSION_DENIED', 'NOT_FOUND', 'INVALID_ARGUMENT', 'UNAUTHENTICATED', 'FAILED_PRECONDITION', 'SERVICE_DISABLED', 'accessNotConfigured', 'forbidden', 'notFound', 'badRequest', 'insufficientPermissions', 'SERVICE_USAGE_DENIED']);
-          const request = async (url, options) => {
-            const host = new URL(url).hostname;
-            stage = host === 'oauth2.googleapis.com' ? 'google-authentication' : host === 'sheets.googleapis.com' ? 'google-sheets' : host === 'docs.googleapis.com' ? 'google-docs' : host.endsWith('googleusercontent.com') ? 'document-image' : 'google-drive';
-            const response = await fetch(url, options);
-            report({ stage, http: response.status });
-            if (!response.ok && ![301,302,303,307,308].includes(response.status)) {
-              try {
-                const data = await response.clone().json();
-                const candidates = typeof data.error === 'string' ? [data.error] : [data.error?.status, ...(data.error?.errors || []).map(e => e.reason), ...(data.error?.details || []).map(e => e.reason)];
-                report({ stage, apiReasons: candidates.filter(x => reasons.has(x)) });
-              } catch { /* Never emit API response text, descriptions, URLs or identifiers. */ }
-            }
-            if (stage === 'google-sheets' && response.ok) {
+          const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+          let row, document, documentRequests = 0;
+          const request = async (url, options = {}) => {
+            const address = new URL(url);
+            const response = await fetch(url, { ...options, cache: 'no-store', headers: { ...options.headers, 'Cache-Control': 'no-cache' } });
+            if (address.hostname === 'sheets.googleapis.com' && response.ok) {
               const data = await response.clone().json();
-              const values = data.valueRanges?.[0]?.values || [];
-              const [headers = [], ...rows] = values;
-              const row = rows.map(values => Object.fromEntries(headers.map((h,i) => [h,String(values[i] ?? '').trim()]))).find(r => r.id === 'diary-01');
-              report({ stage: 'article-row-check', found: !!row, ...(row ? { titleMatches: row.title === '台灣', kindMatches: row.kind === 'diary', published: row.publishStatus === 'published', dateValid: /^\d{4}-\d{2}-\d{2}$/.test(row.date || ''), dateNotFuture: !!row.date && row.date <= new Date().toISOString().slice(0,10), docIdValid: /^[\w-]{10,200}$/.test(row.docId || ''), tabSpecified: !!row.tabId } : {}) });
+              row = rows(data.valueRanges?.[0]?.values).find(value => value.id === 'diary-01');
+              assert(row && row.title === '台灣' && row.kind === 'diary' && published(row), 'The selected diary must still be explicitly published');
             }
-            if (stage === 'google-docs' && response.ok) {
-              const document = await response.clone().json();
-              const count = tabs => tabs.reduce((n,t) => n + 1 + count(t.childTabs || []), 0);
-              report({ stage: 'document-structure', tabCount: count(document.tabs || []) });
+            if (address.hostname === 'docs.googleapis.com' && response.ok && address.pathname.endsWith(`/${row?.docId}`)) {
+              document = await response.clone().json();
+              documentRequests++;
             }
             return response;
           };
           
           try {
-            const { sync } = await import('./scripts/google-sync.mjs');
-            report(await sync({ request }));
-          } catch (error) {
-            const known = new Map([
-              ['Invalid Google identifier in publication configuration','INVALID_GOOGLE_IDENTIFIER'],
-              ['Both Articles and Products sheets are required','ARTICLES_AND_PRODUCTS_REQUIRED'],
-              ['Duplicate Sheet column','DUPLICATE_COLUMN'],
-              ['Published article requires date, title and kind','PUBLISHED_ARTICLE_FIELDS_INVALID'],
-              ['Multiple document tabs: choose the published tabId explicitly','TAB_SELECTION_REQUIRED'],
-              ['Published document tab not found','TAB_NOT_FOUND'],
-              ['Unsupported document structure: use paragraphs, headings and inline images, not tables','UNSUPPORTED_TABLE_OR_STRUCTURE'],
-              ['Floating images must be changed to inline before publication','FLOATING_IMAGE_NOT_INLINE'],
-              ['Unsupported embedded object; use an inline image','UNSUPPORTED_EMBEDDED_OBJECT'],
-              ['Unsupported paragraph element; publication stopped without replacing the live site','UNSUPPORTED_PARAGRAPH_ELEMENT'],
-              ['Refusing to publish an empty document','EMPTY_DOCUMENT'],
-              ['Invalid article','ARTICLE_SCHEMA_INVALID'],
-              ['Invalid ID','ARTICLE_OR_PRODUCT_ID_INVALID'],
-              ['Empty publication refused; explicit GOOGLE_ALLOW_EMPTY_PUBLICATION is required','EMPTY_PUBLICATION_REFUSED']
-            ]);
-            stop(known.get(error?.message) || 'SYNC_ERROR_DETAILS_WITHHELD');
+            const result = await sync({ request });
+            assert.equal(documentRequests, 1, 'Read the selected document directly from Google');
+            const catalog = JSON.parse(await readFile('public/content/catalog.json', 'utf8'));
+            const article = catalog.articles.find(value => value.id === 'diary-01');
+            assert(article && document);
+            const tab = selectTab(document, row.tabId);
+            const paragraphs = (tab.body?.content || []).filter(entry => entry.paragraph).map(entry => entry.paragraph);
+            const nonempty = paragraphs.filter(paragraph => {
+              const text = (paragraph.elements || []).map(element => element.textRun?.content || '').join('');
+              return text.trim() && text.trim() !== '---';
+            });
+            const originalRuns = nonempty.flatMap(paragraph => (paragraph.elements || []).filter(element => element.textRun).map(element => ({
+              text: element.textRun.content || '',
+              ...(element.textRun.textStyle?.bold ? { bold: true } : {}),
+              ...(element.textRun.textStyle?.italic ? { italic: true } : {}),
+            })));
+            const renderedRuns = article.blocks.filter(block => block.type === 'paragraph' || block.type === 'heading').flatMap(block => block.runs);
+            assert.deepEqual(renderedRuns, originalRuns, 'Keep all source text runs, punctuation, newlines and bold/italic formatting');
+            const sourceText = originalRuns.map(run => run.text).join('');
+            const liveResponse = await fetch('https://longday.tw/content/catalog.json', { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+            assert(liveResponse.ok);
+            const live = (await liveResponse.json()).articles.find(value => value.id === 'diary-01');
+            const proof = {
+              status: 'verified', fetchedAt: new Date().toISOString(), id: 'diary-01',
+              published: row.publishStatus === 'published', freshDocumentRequests: documentRequests,
+              sourceCharacters: sourceText.length, sourceParagraphs: nonempty.length,
+              sourceLineBreaks: (sourceText.match(/\n/g) || []).length,
+              blocks: article.blocks.length, sourceRunsMatchOutput: true,
+              sourceTextDigest: digest(sourceText), formattingDigest: digest(originalRuns),
+              bodyDigest: digest(article.blocks), liveBodyDigest: live ? digest(live.blocks) : null,
+              liveMatchesFreshGoogle: !!live && digest(live.blocks) === digest(article.blocks),
+              ...result,
+            };
+            await mkdir('reports', { recursive: true });
+            await writeFile('reports/google-diary-proof.json', JSON.stringify(proof, null, 2));
+            console.log(JSON.stringify(proof));
+          } catch {
+            // Never print a response, source URL, identifier, document body or assertion diff.
+            console.error('Fresh diary verification failed; source details withheld. No production deployment was changed.');
+            process.exitCode = 1;
           }
-          DIAGNOSTIC
-
+          VERIFY
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: longday-fresh-google-diary-proof
+          path: reports/google-diary-proof.json
+          retention-days: 30
   verify-production:
     if: github.ref == 'refs/heads/diagnostics/google-publication' && inputs.mode == 'production'
     runs-on: ubuntu-24.04
