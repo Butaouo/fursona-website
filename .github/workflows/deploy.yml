@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
-          ref: fix/release-motion-loading
+          ref: main
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
@@ -132,7 +132,7 @@ jobs:
           import { characterText } from './src/config/characterCopy.ts';
           
           const origin = 'https://longday.tw/';
-          const expectedBodyDigest = '109ac5e93334572ce27b085dc69c885013fad5ed35d887e97af37bf351bfcdac';
+          const expectedBodyDigest = '623de65440187a22b010315b2519447e41a103c81616a53ab7b7d4c82654626a';
           const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
           const api = await request.newContext({ extraHTTPHeaders: { 'Cache-Control': 'no-cache' } });
           const response = await api.get(`${origin}content/catalog.json`);
@@ -318,3 +318,4 @@ jobs:
           name: longday-candidate-performance-diagnostics
           path: reports/
           retention-days: 30
+
