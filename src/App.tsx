@@ -27,7 +27,7 @@ export default function App() {
     <GlassFilters /><Background enabled={preferences.motionEnabled} route={route} /><Opening enabled={preferences.motionEnabled} route={route} />
     <Header preferences={preferences} />
     <main id="main" tabIndex={-1}><AnimatePresence mode="wait" initial={false}><m.div key={route} className="route-scene" initial={{ opacity: 0, y: preferences.motionEnabled ? 24 : 0, scale: preferences.motionEnabled ? .985 : 1 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: preferences.motionEnabled ? -16 : 0 }} transition={{ duration: preferences.motionEnabled ? .32 : 0, ease: [.22, 1, .36, 1] }}><SceneMotion enabled={preferences.motionEnabled}>{preferences.motionEnabled && <div className="route-light" aria-hidden="true" />}
-    {route ? <Suspense fallback={<p className="page-width content-loading" role="status">{copy('loading', preferences.language)}</p>}><ContentPages route={route} language={preferences.language} /></Suspense> : <><Hero language={preferences.language} animated={preferences.motionEnabled} />
+    {route ? <Suspense fallback={<p className="page-width content-loading" role="status">{copy('loading', preferences.language)}</p>}><ContentPages route={route} language={preferences.language} theme={preferences.effectiveTheme} /></Suspense> : <><Hero language={preferences.language} animated={preferences.motionEnabled} theme={preferences.effectiveTheme} />
       <div className="section-divider page-width" aria-hidden="true"><span />✳<span /></div>
       <section id="connect" className="connect-section page-width" aria-labelledby="connect-heading"><Socials /><Music language={preferences.language} /></section>
       </>}

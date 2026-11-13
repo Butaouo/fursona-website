@@ -13,15 +13,17 @@ permissions:
 
 concurrency:
   group: longday-${{ github.ref }}
-  cancel-in-progress: true
+  # A scheduled refresh must queue behind a complete publication, not cancel
+  # it every 30 minutes. New code and explicit manual runs still supersede it.
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 jobs:
   verify:
     if: github.event_name != 'schedule' || vars.GOOGLE_SYNC_ENABLED == 'true'
     runs-on: ubuntu-24.04
-    # Opening scenarios now wait for the full presentation instead of dismissing
-    # it. Allow aggregate runner time; individual test and audit gates stay unchanged.
-    timeout-minutes: 35
+    # The complete 220-case suite took 33 minutes before evidence upload.
+    # Allow aggregate runner/upload time; individual tests and audit gates stay unchanged.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v6

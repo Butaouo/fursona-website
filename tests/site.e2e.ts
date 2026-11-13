@@ -26,7 +26,7 @@ test('homepage and optimized assets load without clipping or JavaScript errors',
   await expect(page.locator('.fursona-section,.character-notes')).toHaveCount(0);
   await page.screenshot({ path: `reports/${info.project.name}-home-clean.png`, fullPage: true });
   await page.getByRole('link', { name: '設定', exact: true }).click();
-  await expect(page.locator('main h1')).toContainText('設定');
+  await expect(page.locator('main h1')).toContainText('久天');
   await page.getByRole('tab', { name: '角色插畫', exact: true }).click();
   const illustration = page.locator('#panel-artwork img');
   await expect(illustration).toHaveAttribute('src', /lyont-illustration\.webp$/);
