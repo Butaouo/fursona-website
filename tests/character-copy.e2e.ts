@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { characterText } from '../src/config/characterCopy';
+import { expectThemeColors } from './theme';
 
 const current = (position: string) => `[data-copy-position="${position}"] [data-copy-current]`;
 
@@ -127,6 +128,7 @@ test('the redesigned character file remains accessible and responsive in both th
   await page.emulateMedia({reducedMotion:'reduce'});await page.goto('./#/about');
   for(const theme of ['light','dark'] as const){
     await page.getByTestId(`theme-${theme}`).click();
+    await expectThemeColors(page,theme);
     const result=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(result.violations).toEqual([]);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   }
