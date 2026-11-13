@@ -6,12 +6,15 @@ import type { Language } from '../config/site';
 export function usePreferences() {
   const { i18n } = useTranslation();
   const [theme, setTheme] = useState<ThemeChoice>(() => resolveTheme(readPreference('theme')));
+  const [systemDark, setSystemDark] = useState(() => matchMedia('(prefers-color-scheme: dark)').matches);
+  const effectiveTheme = theme === 'system' ? (systemDark ? 'dark' : 'light') : theme;
   const [paused, setPaused] = useState(() => readPreference('motion') === 'paused');
   const [reduced, setReduced] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
   const language: Language = i18n.resolvedLanguage === 'en' ? 'en' : 'zh-TW';
   useEffect(() => {
     const media = matchMedia('(prefers-color-scheme: dark)');
     const apply = () => {
+      setSystemDark(media.matches);
       const effective = theme === 'system' ? (media.matches ? 'dark' : 'light') : theme;
       document.documentElement.dataset.theme = effective;
       document.querySelector('meta[name="theme-color"]')?.setAttribute('content', effective === 'dark' ? '#1b1915' : '#f7f2e8');
@@ -37,5 +40,5 @@ export function usePreferences() {
     savePreference('motion', paused ? 'paused' : 'full');
   }, [paused, reduced]);
   const toggleLanguage = () => void i18n.changeLanguage(language === 'zh-TW' ? 'en' : 'zh-TW');
-  return { theme, setTheme, language, toggleLanguage, paused, setPaused, motionEnabled: !paused && !reduced };
+  return { theme, effectiveTheme, setTheme, language, toggleLanguage, paused, setPaused, motionEnabled: !paused && !reduced };
 }
