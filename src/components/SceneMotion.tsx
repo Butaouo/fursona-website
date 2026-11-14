@@ -56,10 +56,12 @@ export function SceneMotion({ children, enabled }: PropsWithChildren<{ enabled: 
     if (!root || !enabled || !('IntersectionObserver' in window)) return;
     const selector = '.social-panel,.music-panel,.section-heading,.gallery-panel,.character-notes,.content-heading,.reader-heading,.reader-body > *, .archive-card,.empty-state';
     const elements = new Set<HTMLElement>();
+    let frame = 0;
     const observer = new IntersectionObserver(entries => entries.forEach(entry => {
       if (entry.isIntersecting) { (entry.target as HTMLElement).dataset.revealed = 'true'; observer.unobserve(entry.target); }
     }), { threshold: 0, rootMargin: '0px 0px -6% 0px' });
     const collect = () => {
+      frame = 0;
       const added = Array.from(root.querySelectorAll<HTMLElement>(selector)).filter(el => !elements.has(el));
       // Read positions together before writing reveal classes. Interleaved
       // writes/measurements otherwise force a layout for each new reader block.
@@ -71,8 +73,11 @@ export function SceneMotion({ children, enabled }: PropsWithChildren<{ enabled: 
         else observer.observe(el);
       });
     };
-    collect(); const mutations = new MutationObserver(collect); mutations.observe(root, { childList: true, subtree: true });
-    return () => { observer.disconnect(); mutations.disconnect(); elements.forEach(el => { el.classList.remove('scene-reveal'); delete el.dataset.revealed; }); };
+    // Let the complete React commit (including root preference effects) settle
+    // before reading geometry. Coalesce later DOM changes into the same frame.
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(collect); };
+    schedule(); const mutations = new MutationObserver(schedule); mutations.observe(root, { childList: true, subtree: true });
+    return () => { cancelAnimationFrame(frame); observer.disconnect(); mutations.disconnect(); elements.forEach(el => { el.classList.remove('scene-reveal'); delete el.dataset.revealed; }); };
   }, [enabled]);
   return <div ref={scene} className="scene-content">{children}</div>;
 }

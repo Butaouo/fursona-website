@@ -20,7 +20,7 @@ export function Music({ language }: { language: Language }) {
   return <Glass className="music-panel" >
     <div className="panel-topline"><span className="eyebrow">{t('musicLabel')}</span><BrandIcon name="apple" /></div>
     <h2>{t('musicTitle')}</h2>
-    <div className="record-stage"><div className="record-disc" aria-hidden="true"><div className="record-label">LD</div></div><Artwork className="album-cover" src={asset(site.music.artwork)} width="300" height="300" loading="lazy" alt={t('coverAlt')} /></div>
+    <div className="record-stage"><div className="record-disc" aria-hidden="true"><div className="record-label">LD</div></div><Artwork className="album-cover" src={asset(site.music.artwork)} width="300" height="300" loading="lazy" fetchPriority="low" alt={t('coverAlt')} /></div>
     <div className="track-info"><div><span className="track-label">{t('featured')}</span><h3>{site.music.track}</h3><p>{site.music.artist[language]}<span>·</span>{site.music.album}</p></div><Icon name="volume" /></div>
     <div className="apple-player-slot">
       {!loaded ? <button className="button button-primary music-load" type="button" onClick={() => setLoaded(true)}><Icon name="play" />{t('listen')}</button> : <>
