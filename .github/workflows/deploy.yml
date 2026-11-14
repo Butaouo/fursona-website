@@ -40,11 +40,14 @@ jobs:
           
           const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
           let row, document, documentRequests = 0;
+          let stage = 'initial'; const requestStages = [];
           const request = async (url, options = {}) => {
             const address = new URL(url);
             const response = await fetch(url, { ...options, cache: 'no-store', headers: { ...options.headers, 'Cache-Control': 'no-cache' } });
+            requestStages.push({ service: address.hostname === 'oauth2.googleapis.com' ? 'authentication' : address.hostname === 'sheets.googleapis.com' ? 'sheet' : address.hostname === 'docs.googleapis.com' ? 'document' : 'media', status: response.status });
             if (address.hostname === 'sheets.googleapis.com' && response.ok) {
               const data = await response.clone().json();
+              stage = 'publication-row';
               row = rows(data.valueRanges?.[0]?.values).find(value => value.id === 'diary-01');
               assert(row && row.title === '台灣' && row.kind === 'diary' && published(row), 'The selected diary must still be explicitly published');
             }
@@ -56,7 +59,9 @@ jobs:
           };
           
           try {
+            stage = 'synchronize';
             const result = await sync({ request });
+            stage = 'document-selection';
             assert.equal(documentRequests, 1, 'Read the selected document directly from Google');
             const catalog = JSON.parse(await readFile('public/content/catalog.json', 'utf8'));
             const article = catalog.articles.find(value => value.id === 'diary-01');
@@ -73,8 +78,10 @@ jobs:
               ...(element.textRun.textStyle?.italic ? { italic: true } : {}),
             })));
             const renderedRuns = article.blocks.filter(block => block.type === 'paragraph' || block.type === 'heading').flatMap(block => block.runs);
+            stage = 'compare-runs';
             assert.deepEqual(renderedRuns, originalRuns, 'Keep all source text runs, punctuation, newlines and bold/italic formatting');
             const sourceText = originalRuns.map(run => run.text).join('');
+            stage = 'live-catalog';
             const liveResponse = await fetch('https://longday.tw/content/catalog.json', { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
             assert(liveResponse.ok);
             const live = (await liveResponse.json()).articles.find(value => value.id === 'diary-01');
@@ -94,9 +101,9 @@ jobs:
             await mkdir('reports', { recursive: true });
             await writeFile('reports/google-diary-proof.json', JSON.stringify(proof, null, 2));
             console.log(JSON.stringify(proof));
-          } catch {
+          } catch (error) {
             // Never print a response, source URL, identifier, document body or assertion diff.
-            console.error('Fresh diary verification failed; source details withheld. No production deployment was changed.');
+            console.error(JSON.stringify({ status: 'verification-failed', stage, errorType: error?.name, requestStages, rowFound: !!row, published: !!row && published(row), expectedKind: row?.kind === 'diary', expectedTitle: row?.title === '台灣', bareDocId: /^[a-zA-Z0-9_-]+$/.test(row?.docId || ''), documentRequests }));
             process.exitCode = 1;
           }
           VERIFY
@@ -318,4 +325,5 @@ jobs:
           name: longday-candidate-performance-diagnostics
           path: reports/
           retention-days: 30
+
 
