@@ -48,16 +48,19 @@ export async function parseDocument(document, tabId, downloadImage) {
     if (paragraph.positionedObjectIds?.length) fail('Floating images must be changed to inline before publication');
     const style = paragraph.paragraphStyle?.namedStyleType || 'NORMAL_TEXT';
     let runs = [];
-    const flush = () => { const text = runs.map(r=>r.text).join(''); if (text.trim()) blocks.push(text.trim() === '---' ? {type:'divider'} : {type:/HEADING_|TITLE/.test(style)?'heading':'paragraph', ...(/HEADING_|TITLE/.test(style)?{level:style==='HEADING_3'?3:2}:{}),runs}); runs=[]; };
+    const flush = (preserveBlank = false) => { const text = runs.map(r=>r.text).join(''); const heading = !!text.trim() && /HEADING_|TITLE/.test(style); if (text.trim() || (preserveBlank && text.length)) blocks.push(text.trim() === '---' ? {type:'divider'} : {type:heading?'heading':'paragraph', ...(heading?{level:style==='HEADING_3'?3:2}:{}),runs}); runs=[]; };
     for (const element of paragraph.elements || []) {
       if (element.textRun) { const r=element.textRun; runs.push({text:r.content || '',...(r.textStyle?.bold?{bold:true}:{}),...(r.textStyle?.italic?{italic:true}:{})}); }
       else if (element.inlineObjectElement) { flush(); const object=tab.inlineObjects?.[element.inlineObjectElement.inlineObjectId]?.inlineObjectProperties?.embeddedObject; const uri=object?.imageProperties?.contentUri; if(!uri)fail('Unsupported embedded object; use an inline image'); const image=await downloadImage(uri); blocks.push({type:'image',...image,alt:object.description||object.title||'Illustration',...(object.title?{caption:object.title}:{})}); }
       else if (element.horizontalRule || element.pageBreak) { flush();blocks.push({type:'divider'}); }
       else fail('Unsupported paragraph element; publication stopped without replacing the live site');
     }
-    flush();
+    // A text-only empty paragraph is an authored line break. Keep its exact
+    // runs, but do not turn an inline image's terminating newline into an
+    // additional empty paragraph before/after that image.
+    flush((paragraph.elements || []).every(element => !!element.textRun));
   }
-  if (!blocks.length) fail('Refusing to publish an empty document');
+  if (!blocks.some(block => !('runs' in block) || block.runs.some(run => run.text.trim()))) fail('Refusing to publish an empty document');
   return blocks;
 }
 export function safeImageUrl(value) { const url=new URL(value); if(url.protocol!=='https:' || url.username || url.password || !(url.hostname.endsWith('.googleusercontent.com') || url.hostname==='googleusercontent.com'))fail('Image download host is not approved');return url.href; }

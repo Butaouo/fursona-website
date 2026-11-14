@@ -34,9 +34,16 @@ export function AnimatedText({ children, reveal = false }: { children: string; r
   // Only a language change needs layout projection. Initial text and its CSS
   // reveal keep the same size; measuring every label during startup competes
   // with critical image decoding and the opening's first visible frames.
-  return <m.span layout={enabled && resizing ? 'size' : false} transition={{ layout: { duration: .45, ease: [.22, 1, .36, 1] } }} className={`animated-label label-${enabled ? phase : 'idle'}`}>
+  const content = <>
     <span className="sr-only">{children}</span>
-    <span className="label-reserve" aria-hidden="true">{children}</span>
+    <span className="label-reserve" aria-hidden="true">{enabled ? display : children}</span>
     <span className="label-ink" aria-hidden="true" key={text}>{letters}</span>
-  </m.span>;
+  </>;
+  const className = `animated-label label-${enabled ? phase : 'idle'}`;
+  // Initial/settled labels only use CSS. Creating a Motion visual element for
+  // every navigation and button label adds startup work even with layout=false.
+  // Keep projection for the actual language change that needs size animation.
+  return enabled && resizing
+    ? <m.span layout="size" transition={{ layout: { duration: .45, ease: [.22, 1, .36, 1] } }} className={className}>{content}</m.span>
+    : <span className={className}>{content}</span>;
 }

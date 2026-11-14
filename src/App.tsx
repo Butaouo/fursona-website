@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { LazyMotion, MotionConfig, domMax, m, AnimatePresence } from 'motion/react';
+import { LazyMotion, MotionConfig, m, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { site } from './config/site';
 import { usePreferences } from './hooks/usePreferences';
@@ -16,13 +16,17 @@ import { copy } from './content';
 import { Opening, SceneMotion } from './components/SceneMotion';
 import { usePageMetadata } from './hooks/usePageMetadata';
 const ContentPages = lazy(() => import('./pages/ContentPages'));
+// Render the opening and primary content without parsing the full gesture and
+// layout engine first. Load the same complete feature bundle immediately after
+// mounting; animations, drag and shared layout transitions remain available.
+const loadMotionFeatures = () => import('./motionFeatures').then(module => module.default);
 
 export default function App() {
   const { t } = useTranslation();
   const preferences = usePreferences();
   const route = useRoute();
   usePageMetadata(route, preferences.language);
-  return <AnimationContext value={preferences.motionEnabled}><LazyMotion features={domMax}><MotionConfig reducedMotion={preferences.motionEnabled ? 'user' : 'always'}>
+  return <AnimationContext value={preferences.motionEnabled}><LazyMotion features={loadMotionFeatures}><MotionConfig reducedMotion={preferences.motionEnabled ? 'user' : 'always'}>
     <a className="skip-link" href="#main">{t('skip')}</a>
     <GlassFilters /><Background enabled={preferences.motionEnabled} route={route} /><Opening enabled={preferences.motionEnabled} route={route} />
     <Header preferences={preferences} />
