@@ -11,7 +11,10 @@ permissions:
   contents: read
 jobs:
   diagnose:
-    if: github.ref == 'refs/heads/diagnostics/google-publication' && github.event_name == 'workflow_dispatch' && inputs.mode == 'google'
+    if: github.ref == 'refs/heads/diagnostics/google-publication' && github.event_name == 'workflow_dispatch' && (inputs.mode == 'google' || inputs.mode == 'production')
+    outputs:
+      body_digest: ${{ steps.google_proof.outputs.body_digest }}
+      title_digest: ${{ steps.google_proof.outputs.title_digest }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -25,7 +28,9 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Verify fresh published Google diary without deploying
+        id: google_proof
         env:
+          PROOF_REQUIRE_LIVE: ${{ inputs.mode == 'production' && 'true' || 'false' }}
           GOOGLE_SYNC_ENABLED: ${{ vars.GOOGLE_SYNC_ENABLED }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           GOOGLE_PUBLICATION_SHEET_ID: ${{ secrets.GOOGLE_PUBLICATION_SHEET_ID }}
@@ -49,7 +54,7 @@ jobs:
               const data = await response.clone().json();
               stage = 'publication-row';
               row = rows(data.valueRanges?.[0]?.values).find(value => value.id === 'diary-01');
-              assert(row && row.title === '台灣' && row.kind === 'diary' && published(row), 'The selected diary must still be explicitly published');
+              assert(row && typeof row.title === 'string' && row.title.trim() && row.kind === 'diary' && published(row), 'The selected diary must still be explicitly published');
             }
             if (address.hostname === 'docs.googleapis.com' && response.ok && address.pathname.endsWith(`/${row?.docId}`)) {
               document = await response.clone().json();
@@ -97,10 +102,14 @@ jobs:
               sourceTextDigest: digest(sourceText), formattingDigest: digest(originalRuns),
               bodyDigest: digest(article.blocks), liveBodyDigest: live ? digest(live.blocks) : null,
               liveMatchesFreshGoogle: !!live && digest(live.blocks) === digest(article.blocks),
+              titleDigest: digest(row.title), liveTitleMatchesSource: !!live && live.title?.['zh-TW'] === row.title,
               };
             await mkdir('reports', { recursive: true });
             await writeFile('reports/google-diary-proof.json', JSON.stringify(proof, null, 2));
             console.log(JSON.stringify(proof));
+            stage = 'live-match';
+            if (process.env.PROOF_REQUIRE_LIVE === 'true') assert(proof.liveMatchesFreshGoogle && proof.liveTitleMatchesSource, 'The live publication must match the current explicitly published source');
+            if (process.env.GITHUB_OUTPUT) await writeFile(process.env.GITHUB_OUTPUT, `body_digest=${proof.bodyDigest}\ntitle_digest=${proof.titleDigest}\n`);
           } catch (error) {
             // Never print a response, source URL, identifier, document body or assertion diff.
             console.error(JSON.stringify({ status: 'verification-failed', stage, errorType: error?.name, requestStages, rowFound: !!row, published: !!row && published(row), expectedKind: row?.kind === 'diary', expectedTitle: row?.title === '台灣', bareDocId: /^[a-zA-Z0-9_-]+$/.test(row?.docId || ''), documentRequests }));
@@ -114,6 +123,10 @@ jobs:
           path: reports/google-diary-proof.json
           retention-days: 30
   verify-production:
+    needs: diagnose
+    env:
+      EXPECTED_GOOGLE_BODY_DIGEST: ${{ needs.diagnose.outputs.body_digest }}
+      EXPECTED_GOOGLE_TITLE_DIGEST: ${{ needs.diagnose.outputs.title_digest }}
     if: github.ref == 'refs/heads/diagnostics/google-publication' && inputs.mode == 'production'
     runs-on: ubuntu-24.04
     timeout-minutes: 12
@@ -139,14 +152,17 @@ jobs:
           import { characterText } from './src/config/characterCopy.ts';
           
           const origin = 'https://longday.tw/';
-          const expectedBodyDigest = '623de65440187a22b010315b2519447e41a103c81616a53ab7b7d4c82654626a';
+          const expectedBodyDigest = process.env.EXPECTED_GOOGLE_BODY_DIGEST;
+          const expectedTitleDigest = process.env.EXPECTED_GOOGLE_TITLE_DIGEST;
+          assert(/^[a-f0-9]{64}$/.test(expectedBodyDigest || '') && /^[a-f0-9]{64}$/.test(expectedTitleDigest || ''));
           const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
           const api = await request.newContext({ extraHTTPHeaders: { 'Cache-Control': 'no-cache' } });
           const response = await api.get(`${origin}content/catalog.json`);
           assert.equal(response.status(), 200);
           const catalog = await response.json();
           const article = catalog.articles.find(value => value.id === 'diary-01');
-          assert(article && article.kind === 'diary' && article.title['zh-TW'] === '台灣');
+          assert(article && article.kind === 'diary' && typeof article.title['zh-TW'] === 'string');
+          assert.equal(digest(article.title['zh-TW']), expectedTitleDigest, 'Use the current author-published title from Sheets');
           assert.equal(digest(article.blocks), expectedBodyDigest, 'Production must contain the newly fetched Google body');
           const textBlocks = article.blocks.filter(block => block.type === 'paragraph' || block.type === 'heading');
           const expectedText = textBlocks.map(block => block.runs.map(run => run.text).join(''));
@@ -234,7 +250,7 @@ jobs:
                 await expect(page.getByRole('dialog')).not.toBeVisible();
                 await page.goto(`${origin}#/archive`);
                 await page.getByRole('button', { name: '日記', exact: true }).click();
-                await page.locator('.archive-card').filter({ has: page.getByRole('heading', { name: '台灣', exact: true }) }).click();
+                await page.locator('a.archive-card[href="#/archive/diary-01"]').click();
                 await expect(page).toHaveURL(`${origin}#/archive/diary-01`);
                 const paragraphs = page.locator('.reader-body > p,.reader-body > h2,.reader-body > h3');
                 await expect(paragraphs).toHaveCount(textBlocks.length);
@@ -299,7 +315,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
-          ref: fix/release-motion-loading
+          ref: fix/first-paint-layout
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
@@ -325,5 +341,6 @@ jobs:
           name: longday-candidate-performance-diagnostics
           path: reports/
           retention-days: 30
+
 
 
