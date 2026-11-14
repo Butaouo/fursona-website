@@ -16,8 +16,10 @@ export function usePreferences() {
     const apply = () => {
       setSystemDark(media.matches);
       const effective = theme === 'system' ? (media.matches ? 'dark' : 'light') : theme;
-      document.documentElement.dataset.theme = effective;
-      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', effective === 'dark' ? '#1b1915' : '#f7f2e8');
+      if (document.documentElement.dataset.theme !== effective) document.documentElement.dataset.theme = effective;
+      const color = effective === 'dark' ? '#1b1915' : '#f7f2e8';
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta?.getAttribute('content') !== color) meta?.setAttribute('content', color);
     };
     apply(); media.addEventListener('change', apply);
     savePreference('theme', theme);
@@ -32,11 +34,12 @@ export function usePreferences() {
     return () => media.removeEventListener('change', update);
   }, []);
   useEffect(() => {
-    document.documentElement.lang = language;
+    if (document.documentElement.lang !== language) document.documentElement.lang = language;
     savePreference('language', language);
   }, [language]);
   useEffect(() => {
-    document.documentElement.dataset.motion = paused || reduced ? 'still' : 'full';
+    const motion = paused || reduced ? 'still' : 'full';
+    if (document.documentElement.dataset.motion !== motion) document.documentElement.dataset.motion = motion;
     savePreference('motion', paused ? 'paused' : 'full');
   }, [paused, reduced]);
   const toggleLanguage = () => void i18n.changeLanguage(language === 'zh-TW' ? 'en' : 'zh-TW');
