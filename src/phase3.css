@@ -30,25 +30,31 @@
 .glass[data-pressed=true]:after{opacity:1}
 .touch-wave{position:fixed;z-index:7;pointer-events:none;width:180px;height:180px;border:1px solid rgba(238,183,70,.6);border-radius:50%;background:radial-gradient(circle,transparent 30%,rgba(239,183,71,.17) 50%,transparent 72%);opacity:0}
 /* Static preparation first. Only data-phase=playing creates a 4.6s timeline. */
-.opening{position:fixed;inset:0;z-index:60;pointer-events:none;overflow:hidden;contain:layout paint;isolation:isolate}
-.opening-shutter{position:absolute;left:0;width:100%;height:50.2%;background:#201d16;will-change:transform}
-.shutter-top{top:0}.shutter-bottom{bottom:0}
+.opening{--opening-line-top:calc(50% + 85px);--opening-cut:calc(var(--opening-line-top) + 1px);--opening-gold-line:linear-gradient(90deg,transparent,#eabc59,#fff5ce,#eabc59,transparent);position:fixed;inset:0;z-index:60;pointer-events:none;overflow:hidden;contain:layout paint;isolation:isolate}
+.opening-shutter{position:absolute;left:0;width:100%;background:#201d16;will-change:transform}
+.shutter-top{top:0;height:var(--opening-cut)}
+.shutter-bottom{top:var(--opening-cut);bottom:0}
+.opening-shutter::after{content:"";position:absolute;left:0;right:0;height:1px;background:var(--opening-gold-line);opacity:0}
+.shutter-top::after{bottom:0}.shutter-bottom::after{top:0}
 .opening-glow{position:absolute;inset:-20%;opacity:.55;pointer-events:none;will-change:transform,opacity}
 .glow-gold{background:radial-gradient(ellipse at 62% 36%,#b87e244d,transparent 56%)}
 .glow-amber{background:radial-gradient(ellipse at 25% 65%,#b15c273d,transparent 51%)}
-.opening-horizon{position:absolute;top:calc(50% + 85px);left:0;width:100%;height:2px;background:linear-gradient(90deg,transparent,#eabc59,#fff5ce,#eabc59,transparent);transform-origin:center;transform:scaleX(.18);opacity:.35}
+.opening-horizon{position:absolute;top:var(--opening-line-top);left:0;width:100%;height:2px;background:var(--opening-gold-line);transform-origin:center;transform:scaleX(.18);opacity:.35}
 .opening-signature{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff0cd;font-size:clamp(44px,10vw,96px);font-weight:700;letter-spacing:-.06em}
 .opening-signature small{font-size:10px;letter-spacing:.3em;margin-top:10px}.opening-dot{color:#e9b849}
 .opening[data-phase=playing] .opening-shutter{animation-duration:4.6s;animation-fill-mode:both;animation-timing-function:cubic-bezier(.76,0,.24,1)}
 .opening[data-phase=playing] .shutter-top{animation-name:shutter-up}.opening[data-phase=playing] .shutter-bottom{animation-name:shutter-down}
+.opening[data-phase=playing] .opening-shutter::after{animation:opening-edge 4.6s linear both}
 .opening[data-phase=playing] .opening-signature{animation:opening-sign 4.6s both}
 .opening[data-phase=playing] .opening-horizon{animation:opening-line 4.6s both}
 .opening[data-phase=playing] .glow-gold{animation:opening-gold 4.6s both}.opening[data-phase=playing] .glow-amber{animation:opening-amber 4.6s both}
-.opening[data-visible=false] *{animation-play-state:paused!important}
-@keyframes shutter-up{0%,69%{transform:translateY(0)}100%{transform:translateY(-102%)}}
-@keyframes shutter-down{0%,69%{transform:translateY(0)}100%{transform:translateY(102%)}}
-@keyframes opening-line{0%{transform:scaleX(.18);opacity:.35}30%,58%{transform:scaleX(.46);opacity:.8}75%{transform:scaleX(1);opacity:1}100%{transform:scaleX(1.12);opacity:0}}
-@keyframes opening-sign{0%{transform:translateY(10px) scale(.96);opacity:.65}22%,58%{transform:translateY(0) scale(1);opacity:1}79%,100%{transform:translateY(-24px) scale(1.035);opacity:0}}
+.opening[data-visible=false] *,.opening[data-visible=false] .opening-shutter::after{animation-play-state:paused!important}
+/* The shutters and gold edges take over at 76% (3496 ms). */
+@keyframes shutter-up{0%,76%{transform:translate3d(0,0,0)}100%{transform:translate3d(0,-102%,0)}}
+@keyframes shutter-down{0%,76%{transform:translate3d(0,0,0)}100%{transform:translate3d(0,102%,0)}}
+@keyframes opening-line{0%{transform:scaleX(.18);opacity:.35}30%,62%{transform:scaleX(.46);opacity:.8}76%{transform:scaleX(1);opacity:1}76.01%,100%{transform:scaleX(1);opacity:0}}
+@keyframes opening-edge{0%,76%{opacity:0}76.01%{opacity:1}100%{opacity:0}}
+@keyframes opening-sign{0%{transform:translateY(10px) scale(.96);opacity:.65}22%,58%{transform:translateY(0) scale(1);opacity:1}74%,100%{transform:translateY(-24px) scale(1.035);opacity:0}}
 @keyframes opening-gold{0%{transform:translate3d(-8%,8%,0) scale(.9);opacity:.55}58%{transform:translate3d(6%,-4%,0) scale(1.15);opacity:1}100%{transform:translate3d(12%,-10%,0) scale(1.25);opacity:0}}
 @keyframes opening-amber{0%{transform:translate3d(10%,6%,0);opacity:.4}58%{transform:translate3d(-6%,-2%,0);opacity:.85}100%{transform:translate3d(-12%,-8%,0);opacity:0}}
 /* Pages and individual reader layers move on separate timelines. */

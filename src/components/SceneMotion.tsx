@@ -3,6 +3,7 @@ import { afterVisiblePaint, prepareOpening } from '../openingReady';
 /** Keep startup phase changes inside the fixed overlay, outside Motion layout commits. */
 export function Opening({ enabled, route }: { enabled: boolean; route: string }) {
   const screen = useRef<HTMLDivElement>(null);
+  const horizon = useRef<HTMLDivElement>(null);
   const initialRoute = useRef(route);
   const [active, setActive] = useState(() => {
     if (!enabled) return false;
@@ -17,8 +18,29 @@ export function Opening({ enabled, route }: { enabled: boolean; route: string })
   }, [enabled, route, finish]);
   useEffect(() => {
     const root = screen.current;
-    if (!root || !active || !enabled) return;
+    const line = horizon.current;
+    if (!root || !line || !active || !enabled) return;
     const controller = new AbortController();
+    let resizeFrame = 0;
+    const measureCut = () => {
+      // Match the line's rendered center in the fixed overlay's coordinates.
+      // Once the split begins, viewport changes must not move its origin.
+      const [animation] = line.getAnimations();
+      if (animation && Number(animation.currentTime) >= 3496) return;
+      const bounds = line.getBoundingClientRect();
+      const overlay = root.getBoundingClientRect();
+      root.style.setProperty('--opening-cut', `${bounds.top + bounds.height / 2 - overlay.top}px`);
+    };
+    const resize = () => {
+      if (resizeFrame) return;
+      resizeFrame = requestAnimationFrame(() => { resizeFrame = 0; measureCut(); });
+    };
+    const viewport = window.visualViewport;
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(resize) : undefined;
+    observer?.observe(root);
+    window.addEventListener('resize', resize);
+    viewport?.addEventListener('resize', resize);
+    measureCut();
     const visibility = () => { root.dataset.visible = String(document.visibilityState === 'visible'); };
     const hide = () => { root.dataset.visible = 'false'; };
     const end = (event: AnimationEvent) => {
@@ -37,16 +59,20 @@ export function Opening({ enabled, route }: { enabled: boolean; route: string })
       root.dataset.phase = 'armed';
       await afterVisiblePaint(controller.signal);
       if (controller.signal.aborted) return;
+      measureCut();
       root.dataset.phase = 'playing';
       remember();
     })().catch(() => { if (!controller.signal.aborted) finish(); });
     return () => {
       controller.abort(); root.removeEventListener('animationend', end);
+      cancelAnimationFrame(resizeFrame); observer?.disconnect();
+      window.removeEventListener('resize', resize);
+      viewport?.removeEventListener('resize', resize);
       document.removeEventListener('visibilitychange', visibility);
       window.removeEventListener('pageshow', visibility); window.removeEventListener('pagehide', hide);
     };
   }, [active, enabled, finish, remember]);
-  return active && enabled ? <div ref={screen} className="opening" aria-hidden="true" data-testid="opening" data-phase="preparing" data-visible={document.visibilityState === 'visible'}><div className="opening-shutter shutter-top" /><div className="opening-shutter shutter-bottom" /><div className="opening-glow glow-gold" /><div className="opening-glow glow-amber" /><div className="opening-signature"><span>LongDay<span className="opening-dot">.</span></span><small>HaGooLongDay</small></div><div className="opening-horizon" /></div> : null;
+  return active && enabled ? <div ref={screen} className="opening" aria-hidden="true" data-testid="opening" data-phase="preparing" data-visible={document.visibilityState === 'visible'}><div className="opening-shutter shutter-top" /><div className="opening-shutter shutter-bottom" /><div className="opening-glow glow-gold" /><div className="opening-glow glow-amber" /><div className="opening-signature"><span>LongDay<span className="opening-dot">.</span></span><small>HaGooLongDay</small></div><div ref={horizon} className="opening-horizon" /></div> : null;
 }
 /** Observe real content nodes, preserving semantics and reader ordering. */
 export function SceneMotion({ children, enabled }: PropsWithChildren<{ enabled: boolean }>) {

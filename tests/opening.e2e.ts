@@ -173,3 +173,80 @@ test('a warm fresh tab plays once and returning home does not replay it', async 
     await info.attach('network-and-cache', { body: JSON.stringify({ network: browserName === 'chromium' ? ['4G: 1.6 Mbps / 150ms', 'slower: 500 kbps / 400ms'] : 'engine defaults; delayed critical resources are tested separately', resources: await warm.evaluate(() => performance.getEntriesByType('resource').map(entry => ({ name: entry.name, transferSize: (entry as PerformanceResourceTiming).transferSize }))) }), contentType: 'application/json' });
   } finally { await warm.close(); }
 });
+
+test('the full-width gold line splits the shutters at its rendered center after a viewport change', async ({ page }, info) => {
+  await page.goto('./');
+  await started(page);
+  const opening = page.getByTestId('opening');
+  const seek = (time: number) => opening.evaluate(async (root, time) => {
+    const animations = root.getAnimations({ subtree: true });
+    animations.forEach(animation => animation.pause());
+    await Promise.all(animations.map(animation => animation.ready));
+    animations.forEach(animation => { animation.currentTime = time; });
+  }, time);
+  const geometry = () => opening.evaluate(root => {
+    const line = root.querySelector('.opening-horizon')!;
+    const top = root.querySelector('.shutter-top')!.getBoundingClientRect();
+    const bottom = root.querySelector('.shutter-bottom')!.getBoundingClientRect();
+    const horizon = line.getBoundingClientRect();
+    const viewport = root.getBoundingClientRect();
+    return {
+      lineY: horizon.top + horizon.height / 2,
+      lineWidth: horizon.width,
+      lineOpacity: Number(getComputedStyle(line).opacity),
+      viewportWidth: viewport.width,
+      viewportTop: viewport.top,
+      viewportBottom: viewport.bottom,
+      topStart: top.top,
+      topEnd: top.bottom,
+      bottomStart: bottom.top,
+      bottomEnd: bottom.bottom,
+    };
+  });
+  const expectAligned = (sample: Awaited<ReturnType<typeof geometry>>) => {
+    expect(Math.abs(sample.topEnd - sample.lineY)).toBeLessThanOrEqual(1);
+    expect(Math.abs(sample.bottomStart - sample.lineY)).toBeLessThanOrEqual(1);
+    expect(Math.abs(sample.topEnd - sample.bottomStart)).toBeLessThanOrEqual(1);
+    expect(Math.abs(sample.topStart - sample.viewportTop)).toBeLessThanOrEqual(1);
+    expect(Math.abs(sample.bottomEnd - sample.viewportBottom)).toBeLessThanOrEqual(1);
+  };
+
+  await seek(3100);
+  const initial = await geometry();
+  expectAligned(initial);
+  expect(initial.lineWidth).toBeLessThan(initial.viewportWidth);
+  const viewport = page.viewportSize()!;
+  if (info.project.name === 'iphone-webkit') {
+    // The iPhone emulation keeps a fixed layout viewport when changing the
+    // page's emulated dimensions. Model Safari's dynamic toolbar as a change
+    // to the rendered overlay, so ResizeObserver still measures real geometry.
+    await page.addStyleTag({ content: '.opening { bottom: 120px }' });
+  } else {
+    await page.setViewportSize({ width: viewport.height, height: viewport.width });
+  }
+  await expect.poll(async () => Math.abs((await geometry()).lineY - initial.lineY)).toBeGreaterThan(1);
+  await expect.poll(async () => {
+    const sample = await geometry();
+    return Math.max(Math.abs(sample.topEnd - sample.lineY), Math.abs(sample.bottomStart - sample.lineY));
+  }).toBeLessThanOrEqual(1);
+  expectAligned(await geometry());
+
+  await seek(3496);
+  const cut = await geometry();
+  expectAligned(cut);
+  expect(Math.abs(cut.lineWidth - cut.viewportWidth)).toBeLessThanOrEqual(1);
+  expect(cut.lineOpacity).toBeCloseTo(1, 2);
+  await seek(3900);
+  const released = await geometry();
+  expect(released.topEnd).toBeLessThan(cut.lineY - 1);
+  expect(released.bottomStart).toBeGreaterThan(cut.lineY + 1);
+  expect(released.lineOpacity).toBe(0);
+
+  await opening.evaluate(root => {
+    const animations = root.getAnimations({ subtree: true });
+    animations.forEach(animation => animation.play());
+  });
+  await finished(page);
+  await page.getByRole('link', { name: '設定', exact: true }).click();
+  await expect(page.locator('main h1')).toContainText('久天');
+});
