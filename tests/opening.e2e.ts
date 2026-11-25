@@ -174,7 +174,7 @@ test('a warm fresh tab plays once and returning home does not replay it', async 
   } finally { await warm.close(); }
 });
 
-test('the full-width gold line splits the shutters at its rendered center after a viewport change', async ({ page }) => {
+test('the full-width gold line splits the shutters at its rendered center after a viewport change', async ({ page }, info) => {
   await page.goto('./');
   await started(page);
   const opening = page.getByTestId('opening');
@@ -216,7 +216,14 @@ test('the full-width gold line splits the shutters at its rendered center after 
   expectAligned(initial);
   expect(initial.lineWidth).toBeLessThan(initial.viewportWidth);
   const viewport = page.viewportSize()!;
-  await page.setViewportSize({ width: viewport.height, height: viewport.width });
+  if (info.project.name === 'iphone-webkit') {
+    // The iPhone emulation keeps a fixed layout viewport when changing the
+    // page's emulated dimensions. Model Safari's dynamic toolbar as a change
+    // to the rendered overlay, so ResizeObserver still measures real geometry.
+    await page.addStyleTag({ content: '.opening { bottom: 120px }' });
+  } else {
+    await page.setViewportSize({ width: viewport.height, height: viewport.width });
+  }
   await expect.poll(async () => Math.abs((await geometry()).lineY - initial.lineY)).toBeGreaterThan(1);
   await expect.poll(async () => {
     const sample = await geometry();
