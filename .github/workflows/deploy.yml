@@ -47,6 +47,7 @@ jobs:
     timeout-minutes: 45
     outputs:
       content_hash: ${{ steps.manifest.outputs.content_hash }}
+      captured_at: ${{ steps.capture.outputs.at }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v6
@@ -55,6 +56,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Record publication capture time
+        id: capture
+        run: date -u '+at=%Y-%m-%dT%H:%M:%SZ' >> "$GITHUB_OUTPUT"
       - name: Sync explicitly published Google content
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.GOOGLE_SYNC_ENABLED == 'true'
         env:
@@ -67,6 +71,8 @@ jobs:
       - name: Record production publication version
         id: manifest
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          PUBLICATION_CAPTURED_AT: ${{ steps.capture.outputs.at }}
         run: node scripts/publication-manifest.mjs
       - name: TypeScript and production build
         id: build
@@ -107,3 +113,4 @@ jobs:
     uses: ./.github/workflows/publish-pages.yml
     with:
       content_hash: ${{ needs.verify.outputs.content_hash }}
+      captured_at: ${{ needs.verify.outputs.captured_at }}

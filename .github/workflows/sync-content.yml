@@ -20,6 +20,7 @@ jobs:
       changed: ${{ steps.manifest.outputs.changed }}
       baseline: ${{ steps.manifest.outputs.baseline }}
       content_hash: ${{ steps.manifest.outputs.content_hash }}
+      captured_at: ${{ steps.capture.outputs.at }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v6
@@ -27,6 +28,9 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - name: Record publication capture time
+        id: capture
+        run: date -u '+at=%Y-%m-%dT%H:%M:%SZ' >> "$GITHUB_OUTPUT"
       - name: Sync explicitly published Google content
         env:
           GOOGLE_SYNC_ENABLED: 'true'
@@ -37,6 +41,8 @@ jobs:
         run: node scripts/google-sync.mjs
       - name: Compare content with the deployed version
         id: manifest
+        env:
+          PUBLICATION_CAPTURED_AT: ${{ steps.capture.outputs.at }}
         run: node scripts/publication-manifest.mjs compare
       - name: Test the publication and rendering rules
         if: steps.manifest.outputs.changed == 'true'
@@ -60,3 +66,4 @@ jobs:
     with:
       baseline: ${{ needs.refresh.outputs.baseline }}
       content_hash: ${{ needs.refresh.outputs.content_hash }}
+      captured_at: ${{ needs.refresh.outputs.captured_at }}

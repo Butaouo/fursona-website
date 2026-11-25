@@ -8,12 +8,15 @@ on:
       content_hash:
         type: string
         required: true
+      captured_at:
+        type: string
+        required: true
 jobs:
   deploy:
     runs-on: ubuntu-24.04
     concurrency:
       group: longday-production-pages
-      cancel-in-progress: false
+      queue: max
     timeout-minutes: 10
     permissions:
       pages: write
@@ -28,13 +31,27 @@ jobs:
         run: |
           current=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
           test "$current" = "$GITHUB_SHA"
-      - name: Require a full release of this commit before refreshing content
-        if: inputs.baseline != ''
+      - name: Prevent superseding a newer publication
         env:
           BASELINE: ${{ inputs.baseline }}
+          CAPTURED_AT: ${{ inputs.captured_at }}
         run: |
-          curl --fail --silent --show-error --max-time 15 "https://longday.tw/publication-version.json?$GITHUB_RUN_ID" |
-            jq -e --arg sha "$GITHUB_SHA" --arg hash "$BASELINE" '.sha == $sha and .contentHash == $hash' > /dev/null
+          version=$(mktemp)
+          status=$(curl --silent --show-error --max-time 15 --output "$version" --write-out '%{http_code}' \
+            "https://longday.tw/publication-version.json?$GITHUB_RUN_ID")
+          if [[ "$status" == 404 && -z "$BASELINE" ]]; then
+            exit 0
+          fi
+          test "$status" = 200
+          jq -e --arg sha "$GITHUB_SHA" --arg baseline "$BASELINE" --arg captured "$CAPTURED_AT" '
+            if $baseline != "" then
+              .sha == $sha and .contentHash == $baseline and .capturedAt <= $captured
+            elif .sha == $sha then
+              .capturedAt <= $captured
+            else
+              true
+            end
+          ' "$version" > /dev/null
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Deploy production artifact
