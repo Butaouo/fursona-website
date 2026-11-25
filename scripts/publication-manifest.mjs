@@ -16,7 +16,9 @@ for (const file of media.sort()) {
   hash.update(file).update('\0');
   hash.update(createHash('sha256').update(await readFile(join(root, 'media', file))).digest());
 }
-const manifest = { sha, contentHash: hash.digest('hex') };
+const capturedAt = process.env.PUBLICATION_CAPTURED_AT;
+if (!capturedAt || !Number.isFinite(Date.parse(capturedAt))) throw new Error('Expected publication capture time');
+const manifest = { sha, contentHash: hash.digest('hex'), capturedAt };
 await writeFile('public/publication-version.json', JSON.stringify(manifest));
 
 const output = process.env.GITHUB_OUTPUT;
