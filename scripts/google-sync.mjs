@@ -8,7 +8,8 @@ import { readCatalog } from '../src/content.ts';
 
 const MAX_BYTES = 20 * 1024 * 1024;
 const scopes = ['documents.readonly','drive.readonly','spreadsheets.readonly'].map(s=>`https://www.googleapis.com/auth/${s}`).join(' ');
-const fail = (message) => { throw new Error(message); };
+class PublicationError extends Error {}
+const fail = (message) => { throw new PublicationError(message); };
 const validId = value => /^[\w-]{10,200}$/.test(value || '') ? value : fail('Invalid Google identifier in publication configuration');
 /** Accept the ID or an ordinary Sheets share link without changing stored secrets. */
 export function publicationSheetId(value) {
@@ -27,7 +28,26 @@ export function rows(values = []) {
   if (new Set(headers).size !== headers.length) fail('Duplicate Sheet column');
   return data.filter(r=>r.some(v=>String(v).trim())).map(row=>Object.fromEntries(headers.map((key,i)=>[key,String(row[i] ?? '').trim()])));
 }
-export function published(row, today = new Date().toISOString().slice(0,10)) { return row.publishStatus === 'published' && (!row.date || row.date <= today); }
+const taipeiDateFormat = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
+});
+export function taipeiDate(now = new Date()) {
+  return taipeiDateFormat.format(now);
+}
+export function published(row, today = taipeiDate()) {
+  return row.publishStatus === 'published' && (!row.date || row.date <= today);
+}
+function articleDate(value) {
+  const match = /^(\d{4})([-/])(\d{1,2})\2(\d{1,2})$/.exec(value);
+  if (!match) fail('Article date must use an unambiguous year-month-day format');
+  const [, year, , month, day] = match;
+  const canonical = [year, month.padStart(2, '0'), day.padStart(2, '0')].join('-');
+  const parsed = new Date(canonical);
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== canonical) {
+    fail('Article date is not a valid calendar date');
+  }
+  return canonical;
+}
 export function selectTab(document, tabId) {
   const flatten = tabs => tabs.flatMap(t=>[t,...flatten(t.childTabs || [])]);
   const tabs = flatten(document.tabs || []);
@@ -77,15 +97,32 @@ async function accessToken(credentials, request) {
   if(!response.ok)fail(`Google authentication failed (HTTP ${response.status}); secret values are withheld`);
   const result=await response.json();if(typeof result.access_token!=='string')fail('Google token response is invalid');return result.access_token;
 }
-export async function sync({ env=process.env, request=fetch, output=resolve('public/content') }={}) {
+export async function sync({ env=process.env, request=fetch, output=resolve('public/content'), report=()=>{}, today=taipeiDate() }={}) {
   if(env.GOOGLE_SYNC_ENABLED!=='true')return {status:'disabled'};
+  report({ phase: 'authentication' });
   const credentials=JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_JSON || '{}');
   const token=await accessToken(credentials,request);
   const get=async url=>{const response=await request(url,{headers:{Authorization:`Bearer ${token}`},redirect:'error',signal:AbortSignal.timeout(30000)});if(!response.ok)fail(`Google API request failed (HTTP ${response.status}); source details withheld`);return response;};
+  report({ phase: 'publication-sheets' });
   const sheet=publicationSheetId(env.GOOGLE_PUBLICATION_SHEET_ID);
   const values=await (await get(`https://sheets.googleapis.com/v4/spreadsheets/${sheet}/values:batchGet?ranges=Articles!A1:Q1001&ranges=Products!A1:O201`)).json();
   if(values.valueRanges?.length!==2)fail('Both Articles and Products sheets are required');
   const articles=rows(values.valueRanges[0].values),products=rows(values.valueRanges[1].values);
+  const selected = articles.find(row => row.id === 'diary-02');
+  if (selected) {
+    report({
+      phase: 'target-row', kindMatches: selected.kind === 'diary',
+      titleMatches: selected.title === '愛你，恨我', dateShape: /^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(selected.date || ''),
+      date: /^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(selected.date || '') ? selected.date : undefined,
+      expectedFormat: /^\d{4}-\d{2}-\d{2}$/.test(selected.date || ''),
+      explicitlyPublished: selected.publishStatus === 'published',
+      draft: selected.publishStatus === 'draft',
+      docIdPresent: !!selected.docId, docIdValid: /^[\w-]{10,200}$/.test(selected.docId || ''),
+      tabIdPresent: !!selected.tabId, coverDriveIdPresent: !!selected.coverDriveId,
+    });
+  } else {
+    report({ phase: 'target-row', found: false });
+  }
   const parent=resolve(output,'..');await mkdir(parent,{recursive:true});
   const stage=await mkdtemp(join(parent,'.sync-stage-'));await mkdir(join(stage,'media'));
   const saveImage=async bytes=>{const result=await sharp(bytes,{limitInputPixels:24_000_000,animated:false}).rotate().resize({width:2000,height:2400,fit:'inside',withoutEnlargement:true}).webp({quality:86}).toBuffer({resolveWithObject:true});const hash=createHash('sha256').update(result.data).digest('hex');await writeFile(join(stage,'media',`${hash}.webp`),result.data);return {src:`content/media/${hash}.webp`,width:result.info.width,height:result.info.height};};
@@ -93,20 +130,39 @@ export async function sync({ env=process.env, request=fetch, output=resolve('pub
   const fromDrive=async id=>saveImage(await limitedBody(await get(`https://www.googleapis.com/drive/v3/files/${validId(id)}?alt=media`)));
   try {
     const catalog={version:1,articles:[],products:[],relationship:null};
-    for(const row of articles.filter(r=>published(r))){
-      if(!row.date || !row.title || !['novel','diary'].includes(row.kind))fail('Published article requires date, title and kind');
+    for (const row of articles) {
+      if (row.publishStatus !== 'published') continue;
+      const target = row.id === 'diary-02';
+      report({ phase: 'article-date', target });
+      const date = articleDate(row.date);
+      const eligible = published({ ...row, date }, today);
+      if (target) report({ phase: 'target-eligibility', eligible });
+      if (!eligible) continue;
+      if (!row.title || !['novel', 'diary'].includes(row.kind)) fail('Published article requires title and kind');
+      report({ phase: 'article-document', target });
       const document=await(await get(`https://docs.googleapis.com/v1/documents/${validId(row.docId)}?includeTabsContent=true&suggestionsViewMode=PREVIEW_WITHOUT_SUGGESTIONS`)).json();
+      report({ phase: 'article-parsing', target });
       const blocks=await parseDocument(document,row.tabId,fromUri);
-      catalog.articles.push({id:row.id,kind:row.kind,title:localized(row.title,row.titleEn),summary:localized(row.summary,row.summaryEn),date:row.date,...(row.series?{series:row.series,chapter:Number(row.chapter)||0}:{}),...(row.coverDriveId?{cover:(await fromDrive(row.coverDriveId)).src}:{}),blocks});
+      if (target) report({
+        phase: 'target-document', tabs: document.tabs?.length ?? 0, blocks: blocks.length,
+        blankParagraphs: blocks.filter(block => block.type === 'paragraph' && !block.runs.some(run => run.text.trim())).length,
+        images: blocks.filter(block => block.type === 'image').length,
+        styledRuns: blocks.reduce((count, block) => count + (block.runs?.filter(run => run.bold || run.italic).length ?? 0), 0),
+      });
+      report({ phase: 'article-cover', target });
+      catalog.articles.push({id:row.id,kind:row.kind,title:localized(row.title,row.titleEn),summary:localized(row.summary,row.summaryEn),date,...(row.series?{series:row.series,chapter:Number(row.chapter)||0}:{}),...(row.coverDriveId?{cover:(await fromDrive(row.coverDriveId)).src}:{}),blocks});
     }
-    for(const row of products.filter(r=>published(r))){
+    report({ phase: 'products' });
+    for(const row of products.filter(r=>published(r,today))){
       if(!row.name || !row.imageDriveId)fail('Published products require name and imageDriveId');
       const detailIds=(row.detailImageDriveIds||'').split(',').map(id=>id.trim()).filter(Boolean);
       if(detailIds.length>8)fail('A product supports up to eight detail images');
       const images=[];for(const id of detailIds)images.push((await fromDrive(id)).src);
       catalog.products.push({id:row.id,name:localized(row.name,row.nameEn),summary:localized(row.summary,row.summaryEn),description:localized(row.description,row.descriptionEn),status:localized(row.status,row.statusEn),order:Number(row.order)||0,...(row.price?{price:row.price}:{}),image:(await fromDrive(row.imageDriveId)).src,...(images.length?{images}:{})});
     }
+    report({ phase: 'relationship' });
     if(env.GOOGLE_RELATIONSHIP_FOLDER_ID){const folder=validId(env.GOOGLE_RELATIONSHIP_FOLDER_ID);const q=`'${folder}' in parents and trashed = false and name contains 'relationships-published.'`;const result=await(await get(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType),nextPageToken&pageSize=100`)).json();const files=(result.files||[]).filter(f=>/^relationships-published\.(png|jpe?g|webp)$/i.test(f.name));if(files.length!==1)fail('Relationship folder must contain exactly one relationships-published image');catalog.relationship={src:(await fromDrive(files[0].id)).src,alt:localized('角色關係網','Character relationships')};}
+    report({ phase: 'catalog-validation' });
     readCatalog(catalog);
     if(!catalog.articles.length&&!catalog.products.length&&!catalog.relationship && env.GOOGLE_ALLOW_EMPTY_PUBLICATION!=='true')fail('Empty publication refused; explicit GOOGLE_ALLOW_EMPTY_PUBLICATION is required');
     await writeFile(join(stage,'catalog.json'),JSON.stringify(catalog));
@@ -118,4 +174,16 @@ export async function sync({ env=process.env, request=fetch, output=resolve('pub
     return {status:'published',articles:catalog.articles.length,products:catalog.products.length,relationship:!!catalog.relationship};
   }finally{await rm(stage,{recursive:true,force:true});}
 }
-if(process.argv[1] && import.meta.url===pathToFileURL(resolve(process.argv[1])).href){sync().then(result=>console.log(JSON.stringify(result))).catch(()=>{console.error('Google sync failed. Existing deployment is preserved. Check publication rows, inline-image format, API access and repository secrets. No private document content is logged.');process.exitCode=1;});}
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  let stage;
+  sync({ report(event) {
+    stage = event;
+    if (event.phase.startsWith('target-')) console.log(JSON.stringify(event));
+  } }).then(result => console.log(JSON.stringify(result))).catch(error => {
+    console.error(JSON.stringify({
+      status: 'failed', stage,
+      reason: error instanceof PublicationError ? error.message : 'Unexpected publication error',
+    }));
+    process.exitCode = 1;
+  });
+}
