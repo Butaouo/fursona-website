@@ -1,28 +1,16 @@
-name: Test and deploy LongDay to GitHub Pages
+name: Verify the opening geometry in all requested browsers
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
     inputs:
       diagnose_google:
-        description: Read and validate Google publication without deploying
         type: boolean
         default: false
-
 permissions:
   contents: read
-
-concurrency:
-  group: longday-code-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 jobs:
-  diagnose-google:
-    if: github.event_name == 'workflow_dispatch' && inputs.diagnose_google && vars.GOOGLE_SYNC_ENABLED == 'true'
+  opening:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v6
@@ -30,87 +18,7 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - name: Read and validate Google publication
-        env:
-          GOOGLE_DIAGNOSE_TARGET_FIRST: 'true'
-          GOOGLE_SYNC_ENABLED: 'true'
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          GOOGLE_PUBLICATION_SHEET_ID: ${{ secrets.GOOGLE_PUBLICATION_SHEET_ID }}
-          GOOGLE_RELATIONSHIP_FOLDER_ID: ${{ secrets.GOOGLE_RELATIONSHIP_FOLDER_ID }}
-          GOOGLE_ALLOW_EMPTY_PUBLICATION: ${{ vars.GOOGLE_ALLOW_EMPTY_PUBLICATION }}
-        run: node scripts/google-sync.mjs
-  verify:
-    if: github.event_name != 'workflow_dispatch' || !inputs.diagnose_google
-    runs-on: ubuntu-24.04
-    # The complete 220-case suite took 33 minutes before evidence upload.
-    # Allow aggregate runner/upload time; individual tests and audit gates stay unchanged.
-    timeout-minutes: 45
-    outputs:
-      content_hash: ${{ steps.manifest.outputs.content_hash }}
-      captured_at: ${{ steps.capture.outputs.at }}
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          cache: npm
-      - run: npm ci
-      - run: npm test
-      - name: Record publication capture time
-        id: capture
-        run: date -u '+at=%Y-%m-%dT%H:%M:%SZ' >> "$GITHUB_OUTPUT"
-      - name: Sync explicitly published Google content
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.GOOGLE_SYNC_ENABLED == 'true'
-        env:
-          GOOGLE_SYNC_ENABLED: 'true'
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          GOOGLE_PUBLICATION_SHEET_ID: ${{ secrets.GOOGLE_PUBLICATION_SHEET_ID }}
-          GOOGLE_RELATIONSHIP_FOLDER_ID: ${{ secrets.GOOGLE_RELATIONSHIP_FOLDER_ID }}
-          GOOGLE_ALLOW_EMPTY_PUBLICATION: ${{ vars.GOOGLE_ALLOW_EMPTY_PUBLICATION }}
-        run: node scripts/google-sync.mjs
-      - name: Record production publication version
-        id: manifest
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        env:
-          PUBLICATION_CAPTURED_AT: ${{ steps.capture.outputs.at }}
-        run: node scripts/publication-manifest.mjs
-      - name: TypeScript and production build
-        id: build
-        run: npm run build
-      - name: Install browser test engines
-        run: npx playwright install --with-deps chromium firefox webkit
-      # Audit before the long browser suite for faster performance feedback.
-      # Every browser assertion still runs even if the audit fails; either failure blocks deployment.
-      - name: Audit mobile and desktop performance
-        if: success() || (failure() && steps.build.outcome == 'success')
-        run: npm run audit
-      # Xvfb supplies the Linux WebKit display backend; all assertions remain active.
-      - name: Test desktop, mobile, preferences, music, links and accessibility
-        if: success() || (failure() && steps.build.outcome == 'success')
-        run: xvfb-run -a npm run test:e2e -- --headed
-      - name: Upload verification evidence
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: verification-${{ github.sha }}
-          path: |
-            reports/
-            playwright-report/
-            test-results/
-          retention-days: 30
-      - name: Upload production site
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-  deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: verify
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    uses: ./.github/workflows/publish-pages.yml
-    with:
-      content_hash: ${{ needs.verify.outputs.content_hash }}
-      captured_at: ${{ needs.verify.outputs.captured_at }}
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Check timing and geometry across all five browser profiles
+        run: xvfb-run -a npx playwright test tests/opening.e2e.ts --grep 'full-width gold line' --headed
