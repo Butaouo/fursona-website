@@ -22,11 +22,15 @@ export function publicationSheetId(value) {
   return validId(match[1]);
 }
 const localized = (value, english = '') => ({ 'zh-TW': String(value || ''), ...(english ? { en: String(english) } : {}) });
-export function rows(values = []) {
+export function rows(values = [], includeRowNumber = false) {
   if (!values.length) return [];
   const [headers,...data] = values;
   if (new Set(headers).size !== headers.length) fail('Duplicate Sheet column');
-  return data.filter(r=>r.some(v=>String(v).trim())).map(row=>Object.fromEntries(headers.map((key,i)=>[key,String(row[i] ?? '').trim()])));
+  return data.flatMap((row, index) => {
+    if (!row.some(value => String(value).trim())) return [];
+    const fields = Object.fromEntries(headers.map((key, i) => [key, String(row[i] ?? '').trim()]));
+    return [includeRowNumber ? { ...fields, sheetRow: index + 2 } : fields];
+  });
 }
 const taipeiDateFormat = new Intl.DateTimeFormat('sv-SE', {
   timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -102,16 +106,32 @@ export async function sync({ env=process.env, request=fetch, output=resolve('pub
   report({ phase: 'authentication' });
   const credentials=JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_JSON || '{}');
   const token=await accessToken(credentials,request);
-  const get=async url=>{const response=await request(url,{headers:{Authorization:`Bearer ${token}`},redirect:'error',signal:AbortSignal.timeout(30000)});if(!response.ok)fail(`Google API request failed (HTTP ${response.status}); source details withheld`);return response;};
+  const get = async url => {
+    const response = await request(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      redirect: 'error', signal: AbortSignal.timeout(30000),
+    });
+    if (response.ok) return response;
+    const payload = await response.json().catch(() => null);
+    const recognized = new Set([
+      'PERMISSION_DENIED', 'RESOURCE_EXHAUSTED', 'NOT_FOUND', 'SERVICE_DISABLED',
+      'ACCESS_TOKEN_SCOPE_INSUFFICIENT', 'RATE_LIMIT_EXCEEDED',
+      'rateLimitExceeded', 'userRateLimitExceeded', 'dailyLimitExceeded', 'forbidden',
+      'insufficientPermissions', 'accessNotConfigured',
+    ]);
+    const reasons = [payload?.error?.status, ...[...(payload?.error?.errors ?? []), ...(payload?.error?.details ?? [])]
+      .map(item => item?.reason)].filter(reason => recognized.has(reason));
+    fail(`Google API request failed (HTTP ${response.status}${reasons.length ? `, ${[...new Set(reasons)].join(', ')}` : ''})`);
+  };
   report({ phase: 'publication-sheets' });
   const sheet=publicationSheetId(env.GOOGLE_PUBLICATION_SHEET_ID);
   const values=await (await get(`https://sheets.googleapis.com/v4/spreadsheets/${sheet}/values:batchGet?ranges=Articles!A1:Q1001&ranges=Products!A1:O201`)).json();
   if(values.valueRanges?.length!==2)fail('Both Articles and Products sheets are required');
-  const articles=rows(values.valueRanges[0].values),products=rows(values.valueRanges[1].values);
+  const articles=rows(values.valueRanges[0].values,true),products=rows(values.valueRanges[1].values);
   const selected = articles.find(row => row.id === 'diary-02');
   if (selected) {
     report({
-      phase: 'target-row', kindMatches: selected.kind === 'diary',
+      phase: 'target-row', sheetRow: selected.sheetRow, kindMatches: selected.kind === 'diary',
       titleMatches: selected.title === '愛你，恨我', dateShape: /^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(selected.date || ''),
       date: /^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(selected.date || '') ? selected.date : undefined,
       expectedFormat: /^\d{4}-\d{2}-\d{2}$/.test(selected.date || ''),
@@ -130,18 +150,21 @@ export async function sync({ env=process.env, request=fetch, output=resolve('pub
   const fromDrive=async id=>saveImage(await limitedBody(await get(`https://www.googleapis.com/drive/v3/files/${validId(id)}?alt=media`)));
   try {
     const catalog={version:1,articles:[],products:[],relationship:null};
-    for (const row of articles) {
+    const orderedArticles = env.GOOGLE_DIAGNOSE_TARGET_FIRST === 'true' && selected
+      ? [selected, ...articles.filter(row => row !== selected)]
+      : articles;
+    for (const row of orderedArticles) {
       if (row.publishStatus !== 'published') continue;
       const target = row.id === 'diary-02';
-      report({ phase: 'article-date', target });
+      report({ phase: 'article-date', target, sheetRow: row.sheetRow });
       const date = articleDate(row.date);
       const eligible = published({ ...row, date }, today);
       if (target) report({ phase: 'target-eligibility', eligible });
       if (!eligible) continue;
       if (!row.title || !['novel', 'diary'].includes(row.kind)) fail('Published article requires title and kind');
-      report({ phase: 'article-document', target });
+      report({ phase: 'article-document', target, sheetRow: row.sheetRow });
       const document=await(await get(`https://docs.googleapis.com/v1/documents/${validId(row.docId)}?includeTabsContent=true&suggestionsViewMode=PREVIEW_WITHOUT_SUGGESTIONS`)).json();
-      report({ phase: 'article-parsing', target });
+      report({ phase: 'article-parsing', target, sheetRow: row.sheetRow });
       const blocks=await parseDocument(document,row.tabId,fromUri);
       if (target) report({
         phase: 'target-document', tabs: document.tabs?.length ?? 0, blocks: blocks.length,
@@ -149,7 +172,7 @@ export async function sync({ env=process.env, request=fetch, output=resolve('pub
         images: blocks.filter(block => block.type === 'image').length,
         styledRuns: blocks.reduce((count, block) => count + (block.runs?.filter(run => run.bold || run.italic).length ?? 0), 0),
       });
-      report({ phase: 'article-cover', target });
+      report({ phase: 'article-cover', target, sheetRow: row.sheetRow });
       catalog.articles.push({id:row.id,kind:row.kind,title:localized(row.title,row.titleEn),summary:localized(row.summary,row.summaryEn),date,...(row.series?{series:row.series,chapter:Number(row.chapter)||0}:{}),...(row.coverDriveId?{cover:(await fromDrive(row.coverDriveId)).src}:{}),blocks});
     }
     report({ phase: 'products' });
