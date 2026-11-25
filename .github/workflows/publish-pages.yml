@@ -1,0 +1,75 @@
+name: Publish verified LongDay artifact
+on:
+  workflow_call:
+    inputs:
+      baseline:
+        type: string
+        default: ''
+      content_hash:
+        type: string
+        required: true
+      captured_at:
+        type: string
+        required: true
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: longday-production-pages
+      queue: max
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Confirm this commit is still main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
+          test "$current" = "$GITHUB_SHA"
+      - name: Prevent superseding a newer publication
+        env:
+          BASELINE: ${{ inputs.baseline }}
+          CAPTURED_AT: ${{ inputs.captured_at }}
+        run: |
+          version=$(mktemp)
+          status=$(curl --silent --show-error --max-time 15 --output "$version" --write-out '%{http_code}' \
+            "https://longday.tw/publication-version.json?$GITHUB_RUN_ID")
+          if [[ "$status" == 404 && -z "$BASELINE" ]]; then
+            exit 0
+          fi
+          test "$status" = 200
+          jq -e --arg sha "$GITHUB_SHA" --arg baseline "$BASELINE" --arg captured "$CAPTURED_AT" '
+            if $baseline != "" then
+              .sha == $sha and .contentHash == $baseline and .capturedAt <= $captured
+            elif .sha == $sha then
+              .capturedAt <= $captured
+            else
+              true
+            end
+          ' "$version" > /dev/null
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Deploy production artifact
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Verify published HTML
+        env:
+          CONTENT_HASH: ${{ inputs.content_hash }}
+          PAGES_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if curl --fail --silent --show-error --location "$PAGES_URL" --output /tmp/longday-page.html && grep -q 'LongDay' /tmp/longday-page.html &&
+              curl --fail --silent --show-error --max-time 15 "https://longday.tw/publication-version.json?$GITHUB_RUN_ID-$attempt" |
+                jq -e --arg sha "$GITHUB_SHA" --arg hash "$CONTENT_HASH" '.sha == $sha and .contentHash == $hash' > /dev/null; then
+              echo "Verified $PAGES_URL" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1

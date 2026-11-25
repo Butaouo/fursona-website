@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 // @ts-expect-error Server-only ESM is not bundled into the website.
-import { parseDocument } from '../scripts/google-sync.mjs';
+import { parseDocument, published, taipeiDate } from '../scripts/google-sync.mjs';
 
 it('keeps every text-only paragraph including blank lines and exact formatted runs', async () => {
   const paragraphs = [
@@ -30,4 +30,17 @@ it('does not add spacer blocks for the structural newline after an inline image'
 
 it('still rejects a document made only of blank paragraphs', async () => {
   await expect(parseDocument({ body: { content: [{ paragraph: { elements: [{ textRun: { content: '\n' } }] } }, { paragraph: { elements: [{ textRun: { content: '  \n' } }] } }] } }, undefined, () => {})).rejects.toThrow('Refusing to publish an empty document');
+});
+
+it.each([
+  ['2026-11-25T15:59:59Z', '2026-11-25', '2026-11-26'],
+  ['2026-11-25T16:00:00Z', '2026-11-26', '2026-11-27'],
+  ['2026-12-31T15:59:59Z', '2026-12-31', '2027-01-01'],
+  ['2026-12-31T16:00:00Z', '2027-01-01', '2027-01-02'],
+])('uses the Taipei calendar at %s and preserves release eligibility', (instant, today, tomorrow) => {
+  const localDate = taipeiDate(new Date(instant));
+  expect(localDate).toBe(today);
+  expect(published({ date: today, publishStatus: 'published' }, localDate)).toBe(true);
+  expect(published({ date: tomorrow, publishStatus: 'published' }, localDate)).toBe(false);
+  expect(published({ date: today, publishStatus: 'draft' }, localDate)).toBe(false);
 });
