@@ -19,6 +19,9 @@ for (const file of media.sort()) {
 const manifest = { sha, contentHash: hash.digest('hex') };
 await writeFile('public/publication-version.json', JSON.stringify(manifest));
 
+const output = process.env.GITHUB_OUTPUT;
+if (output) await writeFile(output, `content_hash=${manifest.contentHash}\n`, { flag: 'a' });
+
 if (process.argv[2] === 'compare') {
   const response = await fetch('https://longday.tw/publication-version.json?' + Date.now(), {
     headers: { 'Cache-Control': 'no-cache' },
@@ -27,7 +30,8 @@ if (process.argv[2] === 'compare') {
   // The full release establishes the baseline for its own commit.
   if (!response.ok && response.status !== 404) throw new Error('Could not read the deployed publication version');
   const live = response.ok ? await response.json() : {};
-  const changed = live.sha === sha && live.contentHash !== manifest.contentHash;
-  await writeFile(process.env.GITHUB_OUTPUT, `changed=${changed}\n`, { flag: 'a' });
+  const onCurrentRelease = live.sha === sha && /^[a-f0-9]{64}$/.test(live.contentHash);
+  const changed = onCurrentRelease && live.contentHash !== manifest.contentHash;
+  await writeFile(output, `changed=${changed}\nbaseline=${onCurrentRelease ? live.contentHash : ''}\n`, { flag: 'a' });
   console.log(live.sha !== sha ? 'Full code release pending' : changed ? 'Publication changed' : 'Publication unchanged');
 }
