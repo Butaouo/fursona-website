@@ -15,7 +15,7 @@ Google Docs → GitHub Actions（伺服器端唯讀同步、圖片轉存與驗�
 3. 在 Drive 建立專用「LongDay 發布」資料夾，內含發布用 Docs、圖片與下述 Sheet；只將這個資料夾以「檢視者」分享給 Service Account 的 email。不要公開整個 Drive，也不要把私人文件搬入此資料夾。資料夾內檔案會繼承該唯讀權限。
 4. 建立 Google Sheet，兩個工作表必須命名為 `Articles` 與 `Products`，第一列使用下表欄名。可先只填標題列。
 5. 到本專案 **Settings → Secrets and variables → Actions**，新增 Repository secrets：`GOOGLE_SERVICE_ACCOUNT_JSON`（完整 JSON，只貼在 GitHub 的 Secret 表單）、`GOOGLE_PUBLICATION_SHEET_ID`（Sheet 的純 ID，或完整的 `https://docs.google.com/spreadsheets/d/...` 分享網址）。同步程式會在執行時擷取並驗證 Sheet ID，不修改儲存的 Secret，也不在日誌顯示來源網址或 ID。此相容處理只適用於發布索引 Sheet；Articles 的 `docId` 仍填純文件 ID。若要關係圖同步，另設 `GOOGLE_RELATIONSHIP_FOLDER_ID`，指向專用圖檔資料夾。
-6. 至少準備一筆正式發布內容後，新增 Repository variable `GOOGLE_SYNC_ENABLED=true`，在 **Actions → Test and deploy LongDay to GitHub Pages → Run workflow** 執行一次。成功後每小時第 17、47 分自動檢查；GitHub 排程可能延遲，實際更新還需等待完整測試與部署，不是即時。
+6. 至少準備一筆正式發布內容後，新增 Repository variable `GOOGLE_SYNC_ENABLED=true`，在 **Actions → Test and deploy LongDay to GitHub Pages → Run workflow** 執行一次。首次完整發布成功後，**Sync LongDay Google content** 每五分鐘排程檢查。內容及圖片雜湊相同時略過部署。內容有變更時執行單元測試、建置和發布驗證。GitHub Actions 排程和 Pages 更新仍可能延遲。
 
 若目前完全沒有內容但要驗證連線，另外設 `GOOGLE_ALLOW_EMPTY_PUBLICATION=true` 明確允許空白發布；確認完成後移除此旗標。若曾發布過內容，不要隨意關閉 `GOOGLE_SYNC_ENABLED` 後重新部署，因為 Repository 的初始 catalog 是空白；要暫停發文，保留現有 published 列，停止修改即可。
 
@@ -29,7 +29,7 @@ Google Docs → GitHub Actions（伺服器端唯讀同步、圖片轉存與驗�
 | kind | `novel` 或 `diary` |
 | title / titleEn | 中文標題／選填英文標題 |
 | summary / summaryEn | 摘要／選填英文摘要 |
-| date | `YYYY-MM-DD`；以 UTC 日期判斷未來發布 |
+| date | `YYYY-MM-DD`；以 Asia/Taipei 日期判斷未來發布 |
 | series | 同系列識別字；不填則獨立文章 |
 | chapter | 系列章節數字，供上一章／下一章排序 |
 | docId | Google Docs 網址 `/d/` 後的文件 ID |
