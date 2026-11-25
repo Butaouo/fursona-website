@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   diagnose-google:
-    if: github.event_name == 'workflow_dispatch' && (inputs.diagnose_google || github.ref != 'refs/heads/main') && vars.GOOGLE_SYNC_ENABLED == 'true'
+    if: github.event_name == 'workflow_dispatch' && inputs.diagnose_google && vars.GOOGLE_SYNC_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -32,6 +32,7 @@ jobs:
       - run: npm ci
       - name: Read and validate Google publication
         env:
+          GOOGLE_DIAGNOSE_TARGET_FIRST: 'true'
           GOOGLE_SYNC_ENABLED: 'true'
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           GOOGLE_PUBLICATION_SHEET_ID: ${{ secrets.GOOGLE_PUBLICATION_SHEET_ID }}
@@ -39,7 +40,7 @@ jobs:
           GOOGLE_ALLOW_EMPTY_PUBLICATION: ${{ vars.GOOGLE_ALLOW_EMPTY_PUBLICATION }}
         run: node scripts/google-sync.mjs
   verify:
-    if: github.event_name != 'workflow_dispatch' || (github.ref == 'refs/heads/main' && !inputs.diagnose_google)
+    if: github.event_name != 'workflow_dispatch' || !inputs.diagnose_google
     runs-on: ubuntu-24.04
     # The complete 220-case suite took 33 minutes before evidence upload.
     # Allow aggregate runner/upload time; individual tests and audit gates stay unchanged.
