@@ -19,6 +19,7 @@ jobs:
       queue: max
     timeout-minutes: 10
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
