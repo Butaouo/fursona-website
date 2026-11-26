@@ -84,3 +84,54 @@ test('distinct world and region lists open the full illustrated reader', async (
   await page.goto('./#/archive/region-test');
   await expect(page.getByRole('heading', { name: '找不到這個頁面' })).toBeVisible();
 });
+
+test('shared secondary navigation keeps titles and menus aligned as selections change', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.addInitScript(() => sessionStorage.setItem('longday:opening', 'seen'));
+  await page.route('**/content/catalog.json', route => route.fulfill({
+    json: { version: 1, articles: [], products: [], relationship: null },
+  }));
+  await page.goto('./#/world');
+  const menu = page.locator('.section-nav');
+  const heading = page.locator('.content-heading');
+  const indicator = menu.locator('.section-indicator');
+  const geometry = () => page.locator('.content-page').evaluate(root => {
+    const positions = ['.eyebrow', 'h1', '.section-nav'].map(selector => root.querySelector(selector)!.getBoundingClientRect().top);
+    return { positions, fits: document.documentElement.scrollWidth <= innerWidth };
+  });
+  const stable = async (initial: Awaited<ReturnType<typeof geometry>>) => {
+    const next = await geometry();
+    expect(next.fits).toBe(true);
+    next.positions.forEach((value, index) => expect(Math.abs(value - initial.positions[index])).toBeLessThanOrEqual(1));
+  };
+  for (const language of ['zh-TW', 'en']) {
+    if (language === 'en') await page.getByRole('button', { name: 'Switch to English' }).click();
+    for (const theme of ['light', 'dark']) {
+      await page.getByTestId(`theme-${theme}`).click();
+      const links = menu.getByRole('link');
+      await links.nth(0).click();
+      await expect(heading.locator('.eyebrow')).toHaveText('LONGDAY / WORLDBUILDING');
+      const origin = await geometry();
+      for (const [index, title] of [[1, 'REGIONS'], [2, 'RELATIONSHIPS'], [0, 'WORLDBUILDING']] as const) {
+        await links.nth(index).click();
+        await expect(heading.locator('.eyebrow')).toHaveText(`LONGDAY / ${title}`);
+        await expect(heading.locator(':scope > p')).toHaveCount(1);
+        await stable(origin);
+      }
+    }
+  }
+  const worldLineStyle = await indicator.evaluate(line => getComputedStyle(line).transition);
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Works' }).click();
+  await expect(menu.getByRole('button')).toHaveCount(2);
+  await expect(menu.getByRole('button').first()).toHaveAccessibleName('Diary');
+  await expect(menu.getByRole('button').last()).toHaveAttribute('aria-pressed', 'true');
+  expect(await indicator.evaluate(line => getComputedStyle(line).transition)).toBe(worldLineStyle);
+  const original = await geometry();
+  const track = (await menu.boundingBox())!;
+  const marker = (await indicator.boundingBox())!;
+  expect(Math.abs(marker.width - track.width / 2)).toBeLessThanOrEqual(1);
+  await menu.getByRole('button', { name: 'Diary' }).click();
+  await expect(menu.getByRole('button', { name: 'Diary' })).toHaveAttribute('aria-pressed', 'true');
+  await stable(original);
+  await expect.poll(async () => Math.abs((await indicator.boundingBox())!.x - track.x)).toBeLessThanOrEqual(1);
+});
