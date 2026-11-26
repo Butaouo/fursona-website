@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
+export const routePath = (route: string) => route.split('?', 1)[0];
 const legacyRelationships = '#/relationships';
 export function routeFromHash(hash: string) {
   if (hash === '#fursona') return 'about';
