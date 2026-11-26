@@ -1,27 +1,31 @@
-.world-page .content-heading { margin-bottom: 20px; }
-.world-nav {
+:is(.world-page, .archive-page) .content-heading { margin-bottom: 20px; }
+.section-nav {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--section-count), minmax(0, 1fr));
   width: min(100%, 34rem);
   margin-bottom: 34px;
   border-bottom: 1px solid var(--line);
   background: linear-gradient(0deg, var(--glass), transparent);
 }
-.world-nav a {
+.section-nav :is(a, button) {
   display: grid;
   min-width: 0;
   place-items: center;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
   padding: .9rem .15rem;
   color: var(--muted);
   font-size: clamp(.77rem, 2.8vw, .95rem);
   text-align: center;
 }
-.world-nav a:hover, .world-nav a[aria-current] { color: var(--text); }
-.world-indicator {
+.section-nav :is(a, button):hover, .section-nav [aria-current], .section-nav [aria-pressed=true] { color: var(--text); }
+.section-indicator {
   position: absolute;
   inset: auto auto -1px 0;
-  width: calc(100% / 3);
+  width: calc(100% / var(--section-count));
   height: 2px;
   background: linear-gradient(90deg, transparent, var(--gold) 20%, var(--gold) 80%, transparent);
   filter: drop-shadow(0 0 4px var(--gold));
@@ -60,8 +64,13 @@
   .worldbuilding-index .world-entry:has(.world-entry-image), .region-index { grid-template-columns: minmax(0, 1fr); }
   .world-entry { padding-block: 1rem; }
 }
-:root[data-motion=still] .world-indicator,
+:root[data-motion=still] .section-indicator,
 :root[data-motion=still] .world-entry img { transition: none; }
 @media (prefers-reduced-motion: reduce) {
-  .world-indicator, .world-entry img { transition: none; }
+  .section-indicator, .world-entry img { transition: none; }
+}
+
+/* Keep all three localized titles on one line at narrow mobile widths. */
+@media (max-width: 480px) {
+  .world-page .content-heading h1 { font-size: clamp(1.75rem, 9vw, 2.75rem); }
 }
