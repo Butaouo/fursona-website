@@ -26,7 +26,7 @@ Google Docs → GitHub Actions（伺服器端唯讀同步、圖片轉存與驗�
 | 欄位 | 用法 |
 |---|---|
 | id | 網址代號：小寫英文、數字、連字號，唯一，例如 chapter-01 |
-| kind | `novel` 或 `diary` |
+| kind | `novel`（小說）、`diary`（日記）、`worldbuilding`（世界觀）或 `region`（地區） |
 | title / titleEn | 中文標題／選填英文標題 |
 | summary / summaryEn | 摘要／選填英文摘要 |
 | date | `YYYY-MM-DD`；以 Asia/Taipei 日期判斷未來發布 |
@@ -47,6 +47,20 @@ Google Docs → GitHub Actions（伺服器端唯讀同步、圖片轉存與驗�
 4. 將文件連結中的 ID 填入 `docId`，填入文章標題、日期、分類、系列與章節。封面圖片上傳到發布資料夾，填 `coverDriveId`。多分頁文件必須填 `tabId`，避免其他草稿分頁意外公開。
 5. 檢查完畢，把該列改為 `published`。等待下一次排程與驗證完成，到網站「創作」閱讀。日常操作不使用 ChatGPT，也不消耗 ChatGPT Token。
 6. 修改已發布文件會在下一次成功同步公開。若要先保留草稿，複製成另一份未列入發布清單的文件，完成後再替換 docId。改為 draft 會在下次成功同步下架；已被別人下載或快取的內容無法追回。
+
+## 新增世界觀與地區文章
+
+在目前的 `Articles` 工作表各新增一列。以下是欄位填寫示意。將括號中的值換成你自己的內容，確認前先維持 `draft`。
+
+| id | kind | title | titleEn | summary | summaryEn | date | docId | tabId | publishStatus | coverDriveId |
+|---|---|---|---|---|---|---|---|---|---|---|
+| world-01 | worldbuilding | （世界觀標題） | （選填英文標題） | （摘要） | （選填英文摘要） | YYYY-MM-DD | （文件 ID） | （共用文件的分頁 ID） | draft | （選填 Drive 圖片 ID） |
+| region-01 | region | （地區名稱） | （選填英文名稱） | （地區簡介） | （選填英文簡介） | YYYY-MM-DD | （文件 ID） | （共用文件的分頁 ID） | draft | （選填 Drive 圖片 ID） |
+
+- 多分頁可以共用同一個 `docId`，每列填自己的 `tabId`。獨立單分頁文件可留空 `tabId`。
+- 在 Docs 直接加入標題層級、粗體、斜體、空行及多張內嵌圖片。填圖片替代文字的標題可作為圖說。代表圖片從 Drive 填入 `coverDriveId`。
+- `id` 在所有文章之間必須唯一。改成 `published` 後，日期到達台灣當日才會發布。同步每五分鐘排程檢查。
+- 世界觀文章位於 `/#/world/articles/<id>`，地區文章位於 `/#/world/regions/<id>`。介面可切換語言，正文保留作者原文。
 
 ## 更新角色關係圖
 
