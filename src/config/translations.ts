@@ -1,3 +1,5 @@
+import { characterQuotes } from './characterCopy';
+
 export const translations = {
   'zh-TW': {
     skip: '跳至主要內容', navLabel: '主選單', home: '首頁', connect: '找我玩', gallery: '角色圖鑑',
@@ -29,7 +31,7 @@ export const translations = {
     speciesLabel: '物種', nameLabel: '角色名字', personality: '性格',
     theme: '外觀', light: '淺色', dark: '深色', system: '跟隨系統', language: 'Switch to English',
     pauseMotion: '暫停動態效果', resumeMotion: '開啟動態效果', motionPaused: '動態效果已暫停',
-    footerLine: '今天的相遇，也會成為暖暖的一天。', backTop: '回到頂端',
+    footerLine: characterQuotes.daySunset['zh-TW'], backTop: '回到頂端',
     rights: '角色與插畫權利歸各自權利人所有。', imageError: '圖片暫時無法載入。',
     imageOpen: '另開圖片', galleryTabs: '選擇角色圖片',
   },
@@ -63,7 +65,7 @@ export const translations = {
     speciesLabel: 'Species', nameLabel: 'Fursona name', personality: 'Personality',
     theme: 'Appearance', light: 'Light', dark: 'Dark', system: 'System', language: '切換為繁體中文',
     pauseMotion: 'Pause animation', resumeMotion: 'Enable animation', motionPaused: 'Animation paused',
-    footerLine: 'Here’s to another day made a little warmer.', backTop: 'Back to top',
+    footerLine: characterQuotes.daySunset.en, backTop: 'Back to top',
     rights: 'Character and artwork belong to their respective rights holders.', imageError: 'This image could not be loaded.',
     imageOpen: 'Open image', galleryTabs: 'Choose character artwork',
   },
