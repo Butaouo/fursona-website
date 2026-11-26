@@ -99,6 +99,10 @@ test('shared secondary navigation keeps titles and menus aligned as selections c
     const positions = ['.eyebrow', 'h1', '.section-nav'].map(selector => root.querySelector(selector)!.getBoundingClientRect().top);
     return { positions, fits: document.documentElement.scrollWidth <= innerWidth };
   });
+  const finishPageEntrance = () => heading.evaluate(async node => {
+    const animations = [...node.getAnimations(), ...node.closest('.route-scene')!.getAnimations()];
+    await Promise.allSettled(animations.map(animation => animation.finished));
+  });
   const stable = async (initial: Awaited<ReturnType<typeof geometry>>) => {
     const next = await geometry();
     expect(next.fits).toBe(true);
@@ -111,6 +115,7 @@ test('shared secondary navigation keeps titles and menus aligned as selections c
       const links = menu.getByRole('link');
       await links.nth(0).click();
       await expect(heading.locator('.eyebrow')).toHaveText('LONGDAY / WORLDBUILDING');
+      await finishPageEntrance();
       const origin = await geometry();
       for (const [index, title] of [[1, 'REGIONS'], [2, 'RELATIONSHIPS'], [0, 'WORLDBUILDING']] as const) {
         await links.nth(index).click();
@@ -126,6 +131,7 @@ test('shared secondary navigation keeps titles and menus aligned as selections c
   await expect(menu.getByRole('button').first()).toHaveAccessibleName('Diary');
   await expect(menu.getByRole('button').last()).toHaveAttribute('aria-pressed', 'true');
   expect(await indicator.evaluate(line => getComputedStyle(line).transition)).toBe(worldLineStyle);
+  await finishPageEntrance();
   const original = await geometry();
   const track = (await menu.boundingBox())!;
   const marker = (await indicator.boundingBox())!;
