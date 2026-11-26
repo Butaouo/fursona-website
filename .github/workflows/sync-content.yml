@@ -2,7 +2,8 @@ name: Sync LongDay Google content
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/5 * * * *'
+    # Keep the five-minute cadence while avoiding the busier top of the hour.
+    - cron: '2-57/5 * * * *'
 
 permissions:
   contents: read

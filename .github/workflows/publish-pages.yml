@@ -64,9 +64,14 @@ jobs:
           PAGES_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
           for attempt in 1 2 3 4 5 6; do
-            if curl --fail --silent --show-error --location "$PAGES_URL" --output /tmp/longday-page.html && grep -q 'LongDay' /tmp/longday-page.html &&
-              curl --fail --silent --show-error --max-time 15 "https://longday.tw/publication-version.json?$GITHUB_RUN_ID-$attempt" |
-                jq -e --arg sha "$GITHUB_SHA" --arg hash "$CONTENT_HASH" '.sha == $sha and .contentHash == $hash' > /dev/null; then
+            if curl --fail --silent --show-error --location --max-time 15 "$PAGES_URL" --output /tmp/longday-page.html &&
+              grep -q 'LongDay' /tmp/longday-page.html &&
+              curl --fail --silent --show-error --max-time 15 "https://longday.tw/publication-version.json?$GITHUB_RUN_ID-$attempt" -o /tmp/longday-version.json &&
+              catalog_hash=$(jq -er --arg sha "$GITHUB_SHA" --arg hash "$CONTENT_HASH" '
+                select(.sha == $sha and .contentHash == $hash) | .catalogHash | select(test("^[a-f0-9]{64}$"))
+              ' /tmp/longday-version.json) &&
+              curl --fail --silent --show-error --max-time 15 "https://longday.tw/content/catalog.json?$GITHUB_RUN_ID-$attempt" -o /tmp/longday-catalog.json &&
+              printf '%s  %s\n' "$catalog_hash" /tmp/longday-catalog.json | sha256sum --check --status; then
               echo "Verified $PAGES_URL" >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
