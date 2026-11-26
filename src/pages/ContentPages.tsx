@@ -6,14 +6,15 @@ import { AnimatedText, AnimationContext } from '../components/AnimatedText';
 import { Glass } from '../components/Glass';
 import { CharacterPage } from '../components/CharacterPage';
 import './world.css';
+import { routePath } from '../router';
 import type { EffectiveTheme } from '../config/characterCopy';
 
 type Props = { language: Language };
 const label = (key: Parameters<typeof copy>[0], language: Language) => <AnimatedText reveal>{copy(key, language)}</AnimatedText>;
 function PageTitle({ title, intro, language }: Props & { title: 'archive' | 'shop' | 'world' | 'regions' | 'relationships' | 'about'; intro?: Parameters<typeof copy>[0] }) {
-  return <header className="content-heading"><p className="eyebrow">LONGDAY / {title === 'world' ? 'WORLDBUILDING' : title === 'about' ? 'CHARACTER' : title.toUpperCase()}</p><h1>{label(title, language)}<span aria-hidden="true">.</span></h1>{intro && <p>{label(intro, language)}</p>}</header>;
+  return <header className="content-heading"><p className="eyebrow">LONGDAY / {title === 'archive' ? 'ARTICLES' : title === 'world' ? 'WORLDBUILDING' : title === 'about' ? 'CHARACTER' : title.toUpperCase()}</p><h1>{label(title, language)}<span aria-hidden="true">.</span></h1>{intro && <p>{label(intro, language)}</p>}</header>;
 }
-type SectionItem = { label: Parameters<typeof copy>[0] } & ({ href: string } | { select: () => void });
+type SectionItem = { label: Parameters<typeof copy>[0]; href: string };
 
 function SectionNavigation({ items, active, ariaLabel, language, current = 'page' }: Props & {
   items: readonly SectionItem[];
@@ -22,9 +23,9 @@ function SectionNavigation({ items, active, ariaLabel, language, current = 'page
   current?: 'page' | 'location';
 }) {
   return <nav className="section-nav" aria-label={ariaLabel} style={{ '--section-count': items.length } as CSSProperties}>
-    {items.map((item, index) => 'href' in item
-      ? <a key={item.label} href={item.href} aria-current={active === index ? current : undefined}>{label(item.label, language)}</a>
-      : <button key={item.label} type="button" aria-pressed={active === index} onClick={item.select}>{label(item.label, language)}</button>)}
+    {items.map((item, index) => <a key={item.label} href={item.href} aria-current={active === index ? current : undefined}>
+      {label(item.label, language)}
+    </a>)}
     <span aria-hidden="true" className="section-indicator" style={{ transform: `translateX(${active * 100}%)` }} />
   </nav>;
 }
@@ -81,16 +82,19 @@ function Reader({ article, articles, language, base = '/archive', backLabel = 'a
     {zoom && <Lightbox {...zoom} language={language} onClose={() => setZoom(null)} />}
   </article>;
 }
-function Archive({ catalog, language, id }: Props & { catalog: Catalog; id?: string }) {
+const archiveSections = [
+  { label: 'novel', href: '#/archive' },
+  { label: 'diary', href: '#/archive?kind=diary' },
+] as const;
+
+function Archive({ catalog, language, id, kind }: Props & { catalog: Catalog; id?: string; kind: 'novel' | 'diary' }) {
   const enabled = useContext(AnimationContext);
-  const [kind, setKind] = useState<'novel' | 'diary'>('novel');
   const works = catalog.articles.filter(article => article.kind === 'novel' || article.kind === 'diary');
   if (id) { const article = works.find(a => a.id === id); return article ? <Reader key={id} article={article} articles={works} language={language} /> : <Empty title={copy('notFound', language)} />; }
   const articles = works.filter(a => a.kind === kind).sort((a,b) => b.date.localeCompare(a.date));
-  const sections = (['diary', 'novel'] as const).map(value => ({ label: value, select: () => setKind(value) }));
   return <section className="archive-page">
-    <PageTitle title="archive" intro="archiveIntro" language={language} />
-    <SectionNavigation items={sections} active={kind === 'diary' ? 0 : 1} ariaLabel={copy('archive', language)} language={language} />
+    <PageTitle title="archive" language={language} />
+    <SectionNavigation items={archiveSections} active={kind === 'diary' ? 1 : 0} ariaLabel={copy('archive', language)} language={language} />
     <AnimatePresence mode="wait" initial={false}>
       <m.div key={kind} initial={{ opacity: 0, y: enabled ? 8 : 0 }} animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0 }} transition={{ duration: enabled ? .2 : 0 }}>
@@ -176,11 +180,16 @@ export default function ContentPages({ route, language, theme }: Props & { route
   const [catalog,setCatalog]=useState<Catalog|null>(null);
   const [error,setError]=useState(false);
   const [attempt,setAttempt]=useState(0);
-  const needsCatalog=['archive','world','shop'].includes(route.split('/')[0]);
+  const [section, id] = routePath(route).split('/');
+  const needsCatalog=['archive','world','shop'].includes(section);
   useEffect(()=>{if(!needsCatalog)return;const controller=new AbortController();setError(false);fetch(asset('content/catalog.json'),{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('Unavailable');return r.json();}).then(readCatalog).then(setCatalog).catch(()=>{if(!controller.signal.aborted)setError(true);});return()=>controller.abort();},[attempt,needsCatalog]);
   if(route==='about')return <CharacterPage language={language} theme={theme} />;
-  if(!['archive','world','shop'].includes(route.split('/')[0]))return <div className="content-page page-width"><Empty title={copy('notFound',language)}/><a href="#/">{copy('home',language)}</a></div>;
+  if(!needsCatalog)return <div className="content-page page-width"><Empty title={copy('notFound',language)}/><a href="#/">{copy('home',language)}</a></div>;
   if(error)return <div className="content-page page-width"><Empty title={copy('loadError',language)}/><button className="button button-secondary" onClick={()=>setAttempt(x=>x+1)}>{copy('retry',language)}</button></div>;
   if(!catalog)return <p className="content-loading page-width" role="status">{copy('loading',language)}</p>;
-  return <div className="content-page page-width">{route.startsWith('archive')?<Archive catalog={catalog} language={language} id={route.split('/')[1]}/>:route.split('/')[0]==='world'?<World catalog={catalog} route={route} language={language}/>:<Shop catalog={catalog} language={language}/>}</div>;
+  const diary = new URLSearchParams(route.split('?')[1]).get('kind') === 'diary';
+  return <div className="content-page page-width">{section === 'archive'
+    ? <Archive catalog={catalog} language={language} id={id} kind={diary ? 'diary' : 'novel'} />
+    : section === 'world' ? <World catalog={catalog} route={route} language={language} />
+    : <Shop catalog={catalog} language={language} />}</div>;
 }
