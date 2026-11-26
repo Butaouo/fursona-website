@@ -5,11 +5,11 @@ import { Icon } from './Icon';
 import { Glass } from './Glass';
 import { AnimatedText } from './AnimatedText';
 import { copy } from '../content';
-import { useRoute } from '../router';
+import { routePath, useRoute } from '../router';
 type Preferences = ReturnType<typeof usePreferences>;
 export function Header({ preferences: p }: { preferences: Preferences }) {
   const { t } = useTranslation();
-  const route = useRoute().split('/')[0];
+  const route = routePath(useRoute()).split('/')[0];
   return <header className="site-header page-width">
     <a className="wordmark" href="#home" aria-label={`${site.name} · ${t('home')}`}><img src={asset(site.images.avatar)} alt="" width="40" height="40" /><span>LongDay<span className="wordmark-dot">.</span><small>HaGooLongDay</small></span></a>
     <nav className="desktop-nav" aria-label={t('navLabel')}>{(['home','archive','world','shop','about'] as const).map(key => <a key={key} href={key === 'home' ? '#/' : `#/${key}`} aria-current={route === (key === 'home' ? '' : key) ? 'page' : undefined}><AnimatedText>{copy(key, p.language)}</AnimatedText></a>)}</nav>
