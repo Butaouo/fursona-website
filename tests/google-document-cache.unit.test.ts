@@ -24,6 +24,10 @@ it('fetches a shared document once per sync and publishes each correct tab and l
     ['diary-02', 'diary', '愛你，恨我', '2026-11-25', 'shared-document', 't.second', 'published'],
     ['novel-01', 'novel', '獨立文件', '2026-11-25', 'standalone-document', '', 'published'],
     ['diary-03', 'diary', '草稿', '2026-11-25', 'draft-document', '', 'draft'],
+    ['world-01', 'worldbuilding', '世界觀', '2026-11-25', 'shared-document', 't.third', 'published'],
+    ['region-01', 'region', '地區', '2026-11-25', 'shared-document', 't.region', 'published'],
+    ['future-region', 'region', '未來', '2026-11-26', 'future-document', '', 'published'],
+    ['draft-world', 'worldbuilding', '草稿', '2026-11-25', 'private-document', '', 'draft'],
   ];
   const body = (content: string) => ({ content: [{ paragraph: { elements: [{ textRun: { content } }] } }] });
   const tab = (tabId: string, content: string) => ({ tabProperties: { tabId }, documentTab: { body: body(content) } });
@@ -38,7 +42,7 @@ it('fetches a shared document once per sync and publishes each correct tab and l
     if (id === 'standalone-document') return Response.json({ body: body('獨立正文\n') });
     expect(id).toBe('shared-document');
     expect(url.searchParams.get('includeTabsContent')).toBe('true');
-    return Response.json({ tabs: [{ ...tab('t.0', '第一篇\n'), childTabs: [tab('t.second', second), tab('t.third', '第三篇\n')] }] });
+    return Response.json({ tabs: [{ ...tab('t.0', '第一篇\n'), childTabs: [tab('t.second', second), tab('t.third', '世界觀正文\n'), tab('t.region', '地區正文\n'), tab('t.fourth', '第三篇\n')] }] });
   };
   const readBodies = async () => {
     const { articles } = JSON.parse(await readFile(join(output, 'catalog.json'), 'utf8'));
@@ -50,14 +54,16 @@ it('fetches a shared document once per sync and publishes each correct tab and l
     expect(docsRequested).toEqual(['shared-document', 'standalone-document']);
     expect(await readBodies()).toEqual([
       ['diary-01', '第一篇\n'], ['diary-02', '第二篇\n'], ['novel-01', '獨立正文\n'],
+      ['world-01', '世界觀正文\n'], ['region-01', '地區正文\n'],
     ]);
 
     second = '第二篇更新\n';
-    rows.push(['diary-04', 'diary', '新分頁', '2026-11-25', 'shared-document', 't.third', 'published']);
+    rows.push(['diary-04', 'diary', '新分頁', '2026-11-25', 'shared-document', 't.fourth', 'published']);
     await sync({ env, request, output, today: '2026-11-25' });
     expect(docsRequested).toEqual(['shared-document', 'standalone-document', 'shared-document', 'standalone-document']);
     expect(await readBodies()).toEqual([
-      ['diary-01', '第一篇\n'], ['diary-02', '第二篇更新\n'], ['novel-01', '獨立正文\n'], ['diary-04', '第三篇\n'],
+      ['diary-01', '第一篇\n'], ['diary-02', '第二篇更新\n'], ['novel-01', '獨立正文\n'],
+      ['world-01', '世界觀正文\n'], ['region-01', '地區正文\n'], ['diary-04', '第三篇\n'],
     ]);
   } finally {
     await rm(root, { recursive: true, force: true });

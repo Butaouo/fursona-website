@@ -2,13 +2,15 @@ import type { Language } from './config/site';
 export type Copy = { 'zh-TW': string; en?: string };
 export type TextRun = { text: string; bold?: boolean; italic?: boolean };
 export type Block = { type: 'paragraph' | 'heading'; runs: TextRun[]; level?: number } | { type: 'image'; src: string; alt: string; caption?: string; width: number; height: number } | { type: 'divider' };
-export type Article = { id: string; kind: 'novel' | 'diary'; title: Copy; summary: Copy; date: string; cover?: string; series?: string; chapter?: number; blocks: Block[] };
+export const articleKinds = ['novel', 'diary', 'worldbuilding', 'region'] as const;
+export type ArticleKind = typeof articleKinds[number];
+export type Article = { id: string; kind: ArticleKind; title: Copy; summary: Copy; date: string; cover?: string; series?: string; chapter?: number; blocks: Block[] };
 export type Product = { id: string; name: Copy; summary: Copy; description: Copy; image?: string; images?: string[]; price?: string; status: Copy; order: number; placeholder?: boolean };
 export type Catalog = { version: 1; articles: Article[]; products: Product[]; relationship: { src: string; alt: Copy } | null };
 export const localized = (copy: Copy, language: Language) => copy[language] || copy['zh-TW'];
 export const emptyCatalog: Catalog = { version: 1, articles: [], products: [], relationship: null };
 export const words = {
-  home: ['首頁', 'Home'], archive: ['創作', 'Archive'], relationships: ['關係網', 'Relationships'], shop: ['商品', 'Shop'], about: ['設定', 'Character'],
+  home: ['首頁', 'Home'], archive: ['創作', 'Works'], world: ['世界觀', 'World'], worldbuilding: ['世界觀', 'Worldbuilding'], regions: ['地區', 'Regions'], region: ['地區', 'Region'], worldNavigation: ['世界觀導覽', 'World navigation'], relationships: ['關係網', 'Relationships'], shop: ['商品', 'Products'], about: ['設定', 'Character'],
   characterDescription: ['久天的角色設定、穿衣與毛色參考、角色插畫，以及物種與性格資料。', 'LongDay’s character references, outfit, fur markings, illustrations, species and personality.'],
   archiveIntro: ['故事在字裡行間，也在每一幅畫之中。', 'Stories live between the lines — and inside every frame.'],
   relationshipsIntro: ['相遇、牽絆，以及同一個世界裡的彼此。', 'Encounters, connections, and the world we share.'],
@@ -34,7 +36,7 @@ export function readCatalog(value: unknown): Catalog {
   const id = (s: string) => { if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(s) || ids.has(s)) throw new Error('Invalid ID'); ids.add(s); };
   for (const a of c.articles) {
     id(a.id); checkCopy(a.title); checkCopy(a.summary);
-    if (!['novel', 'diary'].includes(a.kind) || !/^\d{4}-\d{2}-\d{2}$/.test(a.date) || !Number.isFinite(Date.parse(a.date)) || !Array.isArray(a.blocks) || a.blocks.length > 10000 || (a.cover && !safeMedia(a.cover))) throw new Error('Invalid article');
+    if (!articleKinds.includes(a.kind) || !/^\d{4}-\d{2}-\d{2}$/.test(a.date) || !Number.isFinite(Date.parse(a.date)) || !Array.isArray(a.blocks) || a.blocks.length > 10000 || (a.cover && !safeMedia(a.cover))) throw new Error('Invalid article');
     for (const b of a.blocks) {
       if (b.type === 'image') { if (!safeMedia(b.src) || typeof b.alt !== 'string' || !(b.width > 0 && b.height > 0)) throw new Error('Invalid image'); }
       else if (b.type === 'paragraph' || b.type === 'heading') { if (!Array.isArray(b.runs) || !b.runs.every(r => typeof r.text === 'string')) throw new Error('Invalid text'); }

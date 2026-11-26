@@ -44,3 +44,15 @@ it.each([
   expect(published({ date: tomorrow, publishStatus: 'published' }, localDate)).toBe(false);
   expect(published({ date: today, publishStatus: 'draft' }, localDate)).toBe(false);
 });
+
+it('uses real heading depth for world and region articles while keeping existing article levels', async () => {
+  const document = { body: { content: ['HEADING_1', 'HEADING_2', 'HEADING_3', 'HEADING_4'].map(namedStyleType => ({
+    paragraph: { paragraphStyle: { namedStyleType }, elements: [{ textRun: { content: namedStyleType } }] },
+  })) } };
+  for (const kind of ['worldbuilding', 'region']) {
+    const blocks = await parseDocument(document, undefined, async () => { throw new Error('Unexpected image'); }, kind);
+    expect(blocks.map((block: { level: number }) => block.level)).toEqual([2, 3, 4, 5]);
+  }
+  const legacy = await parseDocument(document, undefined, async () => { throw new Error('Unexpected image'); }, 'novel');
+  expect(legacy.map((block: { level: number }) => block.level)).toEqual([2, 2, 3, 2]);
+});
