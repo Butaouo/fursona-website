@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useContext, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { AnimatePresence, LayoutGroup, m } from 'motion/react';
 import { asset, type Language } from '../config/site';
 import { copy, localized, readCatalog, type Article, type Catalog, type Product, type TextRun } from '../content';
@@ -11,8 +11,24 @@ import type { EffectiveTheme } from '../config/characterCopy';
 type Props = { language: Language };
 const label = (key: Parameters<typeof copy>[0], language: Language) => <AnimatedText reveal>{copy(key, language)}</AnimatedText>;
 function PageTitle({ title, intro, language }: Props & { title: 'archive' | 'shop' | 'world' | 'regions' | 'relationships' | 'about'; intro?: Parameters<typeof copy>[0] }) {
-  return <header className="content-heading"><p className="eyebrow">LONGDAY / {title === 'about' ? 'CHARACTER' : title.toUpperCase()}</p><h1>{label(title, language)}<span aria-hidden="true">.</span></h1>{intro && <p>{label(intro, language)}</p>}</header>;
+  return <header className="content-heading"><p className="eyebrow">LONGDAY / {title === 'world' ? 'WORLDBUILDING' : title === 'about' ? 'CHARACTER' : title.toUpperCase()}</p><h1>{label(title, language)}<span aria-hidden="true">.</span></h1>{intro && <p>{label(intro, language)}</p>}</header>;
 }
+type SectionItem = { label: Parameters<typeof copy>[0] } & ({ href: string } | { select: () => void });
+
+function SectionNavigation({ items, active, ariaLabel, language, current = 'page' }: Props & {
+  items: readonly SectionItem[];
+  active: number;
+  ariaLabel: string;
+  current?: 'page' | 'location';
+}) {
+  return <nav className="section-nav" aria-label={ariaLabel} style={{ '--section-count': items.length } as CSSProperties}>
+    {items.map((item, index) => 'href' in item
+      ? <a key={item.label} href={item.href} aria-current={active === index ? current : undefined}>{label(item.label, language)}</a>
+      : <button key={item.label} type="button" aria-pressed={active === index} onClick={item.select}>{label(item.label, language)}</button>)}
+    <span aria-hidden="true" className="section-indicator" style={{ transform: `translateX(${active * 100}%)` }} />
+  </nav>;
+}
+
 function Empty({ title, detail }: { title: string; detail?: string }) { return <Glass className="empty-state"><h2>{title}</h2>{detail && <p>{detail}</p>}</Glass>; }
 function Media({ src, alt, className = '', onClick, retryable = true }: { src: string; alt: string; className?: string; onClick?: () => void; retryable?: boolean }) {
   const [failed, setFailed] = useState(false);
@@ -66,11 +82,22 @@ function Reader({ article, articles, language, base = '/archive', backLabel = 'a
   </article>;
 }
 function Archive({ catalog, language, id }: Props & { catalog: Catalog; id?: string }) {
+  const enabled = useContext(AnimationContext);
   const [kind, setKind] = useState<'novel' | 'diary'>('novel');
   const works = catalog.articles.filter(article => article.kind === 'novel' || article.kind === 'diary');
   if (id) { const article = works.find(a => a.id === id); return article ? <Reader key={id} article={article} articles={works} language={language} /> : <Empty title={copy('notFound', language)} />; }
   const articles = works.filter(a => a.kind === kind).sort((a,b) => b.date.localeCompare(a.date));
-  return <><PageTitle title="archive" intro="archiveIntro" language={language} />{works.length > 0 && <div className="content-filters" role="group" aria-label={copy('archive', language)}>{(['novel','diary'] as const).map(k => <button key={k} className="button button-secondary" aria-pressed={kind === k} onClick={() => setKind(k)}>{label(k, language)}</button>)}</div>}{articles.length ? <div className="archive-grid">{articles.map(a => <m.a key={a.id} className="archive-card glass" href={`#/archive/${a.id}`} initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}>{a.cover && <Media src={a.cover} alt="" retryable={false} />}<div><time dateTime={a.date}>{a.date}</time><h2>{localized(a.title, language)}</h2><p>{localized(a.summary, language)}</p></div></m.a>)}</div> : null}</>;
+  const sections = (['diary', 'novel'] as const).map(value => ({ label: value, select: () => setKind(value) }));
+  return <section className="archive-page">
+    <PageTitle title="archive" intro="archiveIntro" language={language} />
+    <SectionNavigation items={sections} active={kind === 'diary' ? 0 : 1} ariaLabel={copy('archive', language)} language={language} />
+    <AnimatePresence mode="wait" initial={false}>
+      <m.div key={kind} initial={{ opacity: 0, y: enabled ? 8 : 0 }} animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0 }} transition={{ duration: enabled ? .2 : 0 }}>
+        {articles.length ? <div className="archive-grid">{articles.map(a => <m.a key={a.id} className="archive-card glass" href={`#/archive/${a.id}`} initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}>{a.cover && <Media src={a.cover} alt="" retryable={false} />}<div><time dateTime={a.date}>{a.date}</time><h2>{localized(a.title, language)}</h2><p>{localized(a.summary, language)}</p></div></m.a>)}</div> : null}
+      </m.div>
+    </AnimatePresence>
+  </section>;
 }
 function Relationships({ catalog, language }: Props & { catalog: Catalog }) {
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
@@ -104,13 +131,9 @@ function World({ catalog, language, route }: Props & { catalog: Catalog; route: 
     .sort((a, b) => b.date.localeCompare(a.date));
   const article = section !== 2 && validRoute && id ? articles.find(item => item.id === id) : undefined;
   return <section className="world-page">
-    {!article && <PageTitle title={current.title} intro={section === 2 ? 'relationshipsIntro' : undefined} language={language} />}
-    <nav className="world-nav" aria-label={copy('worldNavigation', language)}>
-      {worldSections.map((item, index) => <a key={item.href} href={`#${item.href}`} aria-current={index === section ? (article ? 'location' : 'page') : undefined}>
-        {label(item.label, language)}
-      </a>)}
-      <span aria-hidden="true" className="world-indicator" style={{ transform: `translateX(${section * 100}%)` }} />
-    </nav>
+    {!article && <PageTitle title={current.title} language={language} />}
+    <SectionNavigation items={worldSections.map(item => ({ ...item, href: `#${item.href}` }))}
+      active={section} current={article ? 'location' : 'page'} ariaLabel={copy('worldNavigation', language)} language={language} />
     <AnimatePresence mode="wait" initial={false}>
       <m.div key={route} initial={{ opacity: 0, y: enabled ? 8 : 0 }} animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0 }} transition={{ duration: enabled ? .2 : 0 }}>
