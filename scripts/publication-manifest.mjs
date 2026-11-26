@@ -18,7 +18,7 @@ for (const file of media.sort()) {
 }
 const capturedAt = process.env.PUBLICATION_CAPTURED_AT;
 if (!capturedAt || !Number.isFinite(Date.parse(capturedAt))) throw new Error('Expected publication capture time');
-const manifest = { sha, contentHash: hash.digest('hex'), capturedAt };
+const manifest = { sha, contentHash: hash.digest('hex'), catalogHash: createHash('sha256').update(catalog).digest('hex'), capturedAt };
 await writeFile('public/publication-version.json', JSON.stringify(manifest));
 
 const output = process.env.GITHUB_OUTPUT;

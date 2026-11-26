@@ -133,18 +133,7 @@ export async function sync({ env=process.env, request=fetch, output=resolve('pub
   if(values.valueRanges?.length!==2)fail('Both Articles and Products sheets are required');
   const articles=rows(values.valueRanges[0].values,true),products=rows(values.valueRanges[1].values);
   const diagnostic = env.GOOGLE_DIAGNOSE_TARGET_FIRST === 'true';
-  const diaryIds = new Set(['diary-01', 'diary-02']);
-  if (diagnostic) {
-    for (const row of articles.filter(row => diaryIds.has(row.id))) {
-      report({
-        phase: 'diary-source', id: row.id, sheetRow: row.sheetRow, kind: row.kind === 'diary' ? 'diary' : 'other',
-        date: /^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(row.date || '') ? row.date : undefined,
-        status: ['published', 'draft'].includes(row.publishStatus) ? row.publishStatus : 'other',
-        documentRefHash: createHash('sha256').update(row.docId || '').digest('hex'),
-        tabId: /^t\.[a-zA-Z0-9_-]+$/.test(row.tabId || '') ? row.tabId : undefined,
-      });
-    }
-  }
+  const publishedSources = new Map();
   const selected = articles.find(row => row.id === 'diary-02');
   if (selected) {
     report({
@@ -170,10 +159,7 @@ export async function sync({ env=process.env, request=fetch, output=resolve('pub
     // Google returns every tab in one response. Limit reuse to this sync so
     // edits are always fetched again during the next scheduled check.
     const documents = new Map();
-    const orderedArticles = diagnostic && selected
-      ? [selected, ...articles.filter(row => row !== selected)]
-      : articles;
-    for (const row of orderedArticles) {
+    for (const row of articles) {
       if (row.publishStatus !== 'published') continue;
       const target = row.id === 'diary-02';
       report({ phase: 'article-date', target, sheetRow: row.sheetRow });
@@ -191,7 +177,12 @@ export async function sync({ env=process.env, request=fetch, output=resolve('pub
       const document = documents.get(docId);
       report({ phase: 'article-parsing', target, sheetRow: row.sheetRow });
       const blocks=await parseDocument(document,row.tabId,fromUri,row.kind);
-      if (target || (diagnostic && diaryIds.has(row.id))) report({
+      if (diagnostic) publishedSources.set(row.id, {
+        sheetRow: row.sheetRow,
+        documentRefHash: createHash('sha256').update(docId).digest('hex'),
+        tabRefHash: createHash('sha256').update(row.tabId || '').digest('hex'),
+      });
+      if (target) report({
         phase: 'target-document', id: row.id, tabs: document.tabs?.length ?? 0, blocks: blocks.length,
         blankParagraphs: blocks.filter(block => block.type === 'paragraph' && !block.runs.some(run => run.text.trim())).length,
         images: blocks.filter(block => block.type === 'image').length,
@@ -201,30 +192,24 @@ export async function sync({ env=process.env, request=fetch, output=resolve('pub
       catalog.articles.push({id:row.id,kind:row.kind,title:localized(row.title,row.titleEn),summary:localized(row.summary,row.summaryEn),date,...(row.series?{series:row.series,chapter:Number(row.chapter)||0}:{}),...(row.coverDriveId?{cover:(await fromDrive(row.coverDriveId)).src}:{}),blocks});
     }
     if (diagnostic) {
-      const diaries = catalog.articles.filter(article => diaryIds.has(article.id));
-      const [first, second] = diaries;
-      report({
-        phase: 'diary-proof', documentRequests: documents.size,
-        diaryCount: diaries.length,
-        distinctBodies: diaries.length === 2 && JSON.stringify(first.blocks) !== JSON.stringify(second.blocks),
-      });
+      report({ phase: 'publication-proof', documentRequests: documents.size, articles: catalog.articles.length });
       try {
         const response = await request(`https://longday.tw/content/catalog.json?${Date.now()}`, {
           headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(15000),
         });
         if (!response.ok) throw new Error('Live catalog unavailable');
         const live = readCatalog(await response.json());
-        for (const article of diaries) {
+        for (const article of catalog.articles) {
           const publishedArticle = live.articles.find(item => item.id === article.id);
           report({
-            phase: 'diary-live-match', id: article.id, found: !!publishedArticle,
+            phase: 'publication-live-match', id: article.id, ...publishedSources.get(article.id), found: !!publishedArticle,
             titleMatches: JSON.stringify(publishedArticle?.title) === JSON.stringify(article.title),
             dateMatches: publishedArticle?.date === article.date,
             blocksMatch: JSON.stringify(publishedArticle?.blocks) === JSON.stringify(article.blocks),
           });
         }
       } catch {
-        report({ phase: 'diary-live-match', available: false });
+        report({ phase: 'publication-live-match', available: false });
       }
     }
     report({ phase: 'products' });
@@ -253,7 +238,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   let stage;
   sync({ report(event) {
     stage = event;
-    if (event.phase.startsWith('target-') || event.phase.startsWith('diary-')) console.log(JSON.stringify(event));
+    if (event.phase.startsWith('target-') || ['publication-proof', 'publication-live-match'].includes(event.phase)) console.log(JSON.stringify(event));
   } }).then(result => console.log(JSON.stringify(result))).catch(error => {
     console.error(JSON.stringify({
       status: 'failed', stage,
