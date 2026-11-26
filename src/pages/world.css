@@ -1,0 +1,67 @@
+.world-page .content-heading { margin-bottom: 20px; }
+.world-nav {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: min(100%, 34rem);
+  margin-bottom: 34px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(0deg, var(--glass), transparent);
+}
+.world-nav a {
+  display: grid;
+  min-width: 0;
+  place-items: center;
+  padding: .9rem .15rem;
+  color: var(--muted);
+  font-size: clamp(.77rem, 2.8vw, .95rem);
+  text-align: center;
+}
+.world-nav a:hover, .world-nav a[aria-current] { color: var(--text); }
+.world-indicator {
+  position: absolute;
+  inset: auto auto -1px 0;
+  width: calc(100% / 3);
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold) 20%, var(--gold) 80%, transparent);
+  filter: drop-shadow(0 0 4px var(--gold));
+  pointer-events: none;
+  transition: transform .35s cubic-bezier(.22, 1, .36, 1);
+}
+.worldbuilding-index { display: grid; gap: 2rem; }
+.world-entry {
+  min-width: 0;
+  display: grid;
+  align-items: center;
+  gap: clamp(1rem, 4vw, 3rem);
+  padding-block: 1.6rem;
+  border-top: 1px solid var(--line);
+}
+.worldbuilding-index .world-entry:has(.world-entry-image) { grid-template-columns: 1.4fr 1fr; }
+.world-entry-image { overflow: hidden; }
+.world-entry-image .content-image {
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  transition: transform .45s cubic-bezier(.22, 1, .36, 1);
+}
+.world-entry:hover img, .world-entry:focus-visible img { transform: scale(1.025); }
+.world-entry h2 {
+  font-family: 'Noto Serif TC', Georgia, serif;
+  font-size: clamp(1.45rem, 4vw, 2.7rem);
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.world-entry p { margin: .65rem 0 0; color: var(--muted); line-height: 1.7; overflow-wrap: anywhere; }
+.region-index { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(1rem, 4vw, 3rem); }
+.region-index .world-entry { align-content: start; gap: 1rem; }
+.world-page .reader-body :is(h4, h5, h6) { margin: 2em 0 .8em; line-height: 1.6; scroll-margin-top: 30px; }
+@media (max-width: 620px) {
+  .worldbuilding-index .world-entry:has(.world-entry-image), .region-index { grid-template-columns: minmax(0, 1fr); }
+  .world-entry { padding-block: 1rem; }
+}
+:root[data-motion=still] .world-indicator,
+:root[data-motion=still] .world-entry img { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .world-indicator, .world-entry img { transition: none; }
+}

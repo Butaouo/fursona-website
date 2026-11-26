@@ -5,12 +5,13 @@ import { copy, localized, readCatalog, type Article, type Catalog, type Product,
 import { AnimatedText, AnimationContext } from '../components/AnimatedText';
 import { Glass } from '../components/Glass';
 import { CharacterPage } from '../components/CharacterPage';
+import './world.css';
 import type { EffectiveTheme } from '../config/characterCopy';
 
 type Props = { language: Language };
 const label = (key: Parameters<typeof copy>[0], language: Language) => <AnimatedText reveal>{copy(key, language)}</AnimatedText>;
-function PageTitle({ title, intro, language }: Props & { title: 'archive' | 'shop' | 'relationships' | 'about'; intro: Parameters<typeof copy>[0] }) {
-  return <header className="content-heading"><p className="eyebrow">LONGDAY / {title === 'about' ? 'CHARACTER' : title.toUpperCase()}</p><h1>{label(title, language)}<span aria-hidden="true">.</span></h1><p>{label(intro, language)}</p></header>;
+function PageTitle({ title, intro, language }: Props & { title: 'archive' | 'shop' | 'world' | 'regions' | 'relationships' | 'about'; intro?: Parameters<typeof copy>[0] }) {
+  return <header className="content-heading"><p className="eyebrow">LONGDAY / {title === 'about' ? 'CHARACTER' : title.toUpperCase()}</p><h1>{label(title, language)}<span aria-hidden="true">.</span></h1>{intro && <p>{label(intro, language)}</p>}</header>;
 }
 function Empty({ title, detail }: { title: string; detail?: string }) { return <Glass className="empty-state"><h2>{title}</h2>{detail && <p>{detail}</p>}</Glass>; }
 function Media({ src, alt, className = '', onClick, retryable = true }: { src: string; alt: string; className?: string; onClick?: () => void; retryable?: boolean }) {
@@ -27,7 +28,14 @@ function Lightbox({ src, alt, onClose, language }: Props & { src: string; alt: s
   return <dialog ref={dialog} className="art-dialog" aria-label={alt} onCancel={onClose}><button className="dialog-close button button-secondary" onClick={onClose}>{copy('close', language)}</button><Media src={src} alt={alt} /><p>{alt}</p></dialog>;
 }
 function Runs({ runs }: { runs: TextRun[] }) { return <>{runs.map((r, i) => <span key={i} style={{ fontWeight: r.bold ? 700 : undefined, fontStyle: r.italic ? 'italic' : undefined }}>{r.text}</span>)}</>; }
-function Reader({ article, articles, language }: Props & { article: Article; articles: Article[] }) {
+const headingTags = { 2: 'h2', 3: 'h3', 4: 'h4', 5: 'h5', 6: 'h6' } as const;
+function Reader({ article, articles, language, base = '/archive', backLabel = 'archive' }: Props & {
+  article: Article;
+  articles: Article[];
+  base?: string;
+  backLabel?: 'archive' | 'worldbuilding' | 'regions';
+}) {
+  const articleBase = base === '/world' ? '/world/articles' : base;
   const [zoom, setZoom] = useState<{ src: string; alt: string } | null>(null);
   const [progress, setProgress] = useState(0);
   const body = useRef<HTMLDivElement>(null);
@@ -40,25 +48,29 @@ function Reader({ article, articles, language }: Props & { article: Article; art
   const chapters = article.series ? articles.filter(a => a.kind === article.kind && a.series === article.series).sort((a,b) => (a.chapter ?? 0) - (b.chapter ?? 0)) : [article];
   const index = chapters.findIndex(a => a.id === article.id);
   return <article className="reader">
-    <a className="text-link" href="#/archive">← {copy('archive', language)}</a>
+    <a className="text-link" href={`#${base}`}>← {copy(backLabel, language)}</a>
     <header className="reader-heading"><p className="eyebrow">{copy(article.kind, language)} / <time dateTime={article.date}>{article.date}</time></p><h1><AnimatedText reveal>{localized(article.title, language)}</AnimatedText></h1><p>{localized(article.summary, language)}</p>{language === 'en' && <small>{copy('original', language)}</small>}</header>
-    {article.cover && <Media src={article.cover} alt={localized(article.title, language)} className="reader-cover" />}
+    {article.cover && <Media src={article.cover} alt={localized(article.title, language)} className="reader-cover" onClick={base !== '/archive' ? () => setZoom({ src: article.cover!, alt: localized(article.title, language) }) : undefined} />}
     <div className="reading-progress" role="progressbar" aria-label={copy('progress', language)} aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}><span style={{ transform: `scaleX(${progress / 100})` }} /></div>
-    <div className="reader-layout"><aside className="reader-toc"><h2>{copy('contents', language)}</h2>{chapters.map(a => <a key={a.id} href={`#/archive/${a.id}`} aria-current={a.id === article.id ? 'page' : undefined}>{localized(a.title, language)}</a>)}{article.blocks.map((b, i) => b.type === 'heading' && <button key={i} onClick={() => document.getElementById(`section-${i}`)?.scrollIntoView({ behavior: document.documentElement.dataset.motion === 'still' ? 'instant' : 'smooth' })}>{b.runs.map(r => r.text).join('')}</button>)}</aside>
+    <div className="reader-layout"><aside className="reader-toc"><h2>{copy('contents', language)}</h2>{chapters.map(a => <a key={a.id} href={`#${articleBase}/${a.id}`} aria-current={a.id === article.id ? 'page' : undefined}>{localized(a.title, language)}</a>)}{article.blocks.map((b, i) => b.type === 'heading' && <button key={i} onClick={() => document.getElementById(`section-${i}`)?.scrollIntoView({ behavior: document.documentElement.dataset.motion === 'still' ? 'instant' : 'smooth' })}>{b.runs.map(r => r.text).join('')}</button>)}</aside>
     <div ref={body} className="reader-body">{article.blocks.map((block, i) => {
       if (block.type === 'divider') return <hr key={i} />;
       if (block.type === 'image') return <figure key={i} style={{ '--image-ratio': `${block.width}/${block.height}` } as React.CSSProperties}><Media src={block.src} alt={block.alt} onClick={() => setZoom({ src: block.src, alt: block.alt })} />{block.caption && <figcaption>{block.caption}</figcaption>}</figure>;
-      if (block.type === 'heading') return block.level === 3 ? <h3 key={i} id={`section-${i}`}><Runs runs={block.runs} /></h3> : <h2 key={i} id={`section-${i}`}><Runs runs={block.runs} /></h2>;
+      if (block.type === 'heading') {
+        const Heading = headingTags[block.level as keyof typeof headingTags] || 'h2';
+        return <Heading key={i} id={`section-${i}`}><Runs runs={block.runs} /></Heading>;
+      }
       return <p key={i}><Runs runs={block.runs} /></p>;
-    })}<nav className="chapter-navigation" aria-label={copy('contents', language)}>{index > 0 && <a className="button button-secondary" href={`#/archive/${chapters[index - 1].id}`}>← {copy('previous', language)}</a>}{index < chapters.length - 1 && <a className="button button-secondary" href={`#/archive/${chapters[index + 1].id}`}>{copy('next', language)} →</a>}</nav></div></div>
+    })}<nav className="chapter-navigation" aria-label={copy('contents', language)}>{index > 0 && <a className="button button-secondary" href={`#${articleBase}/${chapters[index - 1].id}`}>← {copy('previous', language)}</a>}{index < chapters.length - 1 && <a className="button button-secondary" href={`#${articleBase}/${chapters[index + 1].id}`}>{copy('next', language)} →</a>}</nav></div></div>
     {zoom && <Lightbox {...zoom} language={language} onClose={() => setZoom(null)} />}
   </article>;
 }
 function Archive({ catalog, language, id }: Props & { catalog: Catalog; id?: string }) {
   const [kind, setKind] = useState<'novel' | 'diary'>('novel');
-  if (id) { const article = catalog.articles.find(a => a.id === id); return article ? <Reader key={id} article={article} articles={catalog.articles} language={language} /> : <Empty title={copy('notFound', language)} />; }
-  const articles = catalog.articles.filter(a => a.kind === kind).sort((a,b) => b.date.localeCompare(a.date));
-  return <><PageTitle title="archive" intro="archiveIntro" language={language} />{catalog.articles.length > 0 && <div className="content-filters" role="group" aria-label={copy('archive', language)}>{(['novel','diary'] as const).map(k => <button key={k} className="button button-secondary" aria-pressed={kind === k} onClick={() => setKind(k)}>{label(k, language)}</button>)}</div>}{articles.length ? <div className="archive-grid">{articles.map(a => <m.a key={a.id} className="archive-card glass" href={`#/archive/${a.id}`} initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}>{a.cover && <Media src={a.cover} alt="" retryable={false} />}<div><time dateTime={a.date}>{a.date}</time><h2>{localized(a.title, language)}</h2><p>{localized(a.summary, language)}</p></div></m.a>)}</div> : null}</>;
+  const works = catalog.articles.filter(article => article.kind === 'novel' || article.kind === 'diary');
+  if (id) { const article = works.find(a => a.id === id); return article ? <Reader key={id} article={article} articles={works} language={language} /> : <Empty title={copy('notFound', language)} />; }
+  const articles = works.filter(a => a.kind === kind).sort((a,b) => b.date.localeCompare(a.date));
+  return <><PageTitle title="archive" intro="archiveIntro" language={language} />{works.length > 0 && <div className="content-filters" role="group" aria-label={copy('archive', language)}>{(['novel','diary'] as const).map(k => <button key={k} className="button button-secondary" aria-pressed={kind === k} onClick={() => setKind(k)}>{label(k, language)}</button>)}</div>}{articles.length ? <div className="archive-grid">{articles.map(a => <m.a key={a.id} className="archive-card glass" href={`#/archive/${a.id}`} initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}>{a.cover && <Media src={a.cover} alt="" retryable={false} />}<div><time dateTime={a.date}>{a.date}</time><h2>{localized(a.title, language)}</h2><p>{localized(a.summary, language)}</p></div></m.a>)}</div> : null}</>;
 }
 function Relationships({ catalog, language }: Props & { catalog: Catalog }) {
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
@@ -73,7 +85,51 @@ function Relationships({ catalog, language }: Props & { catalog: Catalog }) {
   const reset = () => setView({ x:0,y:0,scale:1 });
   const zoom = (delta: number) => setView(v => ({ ...v, scale:Math.min(6,Math.max(1,v.scale+delta)) }));
   useEffect(() => { if (!full) return; const previous = document.body.style.overflow; const focus = document.activeElement as HTMLElement; document.body.style.overflow='hidden'; shell.current?.focus(); const key = (e: KeyboardEvent) => { if (e.key==='Escape') setFull(false); if(e.key==='Tab') { const nodes = shell.current?.querySelectorAll<HTMLElement>('button,[tabindex="0"]'); if(!nodes?.length) return; const first=nodes[0],end=nodes[nodes.length-1]; if(e.shiftKey && document.activeElement===first) { e.preventDefault();end.focus(); } else if(!e.shiftKey && document.activeElement===end) { e.preventDefault();first.focus(); } } }; const changed=()=>{if(!document.fullscreenElement)setFull(false);}; addEventListener('keydown',key); document.addEventListener('fullscreenchange',changed); return () => {document.body.style.overflow=previous;removeEventListener('keydown',key);document.removeEventListener('fullscreenchange',changed);if(document.fullscreenElement)void document.exitFullscreen();focus?.focus({preventScroll:true});}; }, [full]);
-  return <><PageTitle title="relationships" intro="relationshipsIntro" language={language} />{catalog.relationship ? <div ref={shell} tabIndex={-1} className={`map-shell glass ${full ? 'map-full' : ''}`} role={full ? 'dialog' : undefined} aria-modal={full || undefined} aria-label={copy('relationships',language)}><div className="map-tools"><button className="button button-secondary" onClick={reset}>{copy('reset',language)}</button><button className="icon-button" aria-label={copy('zoomIn',language)} onClick={()=>zoom(.25)}>+</button><button className="icon-button" aria-label={copy('zoomOut',language)} onClick={()=>zoom(-.25)}>−</button><button className="button button-secondary" onClick={()=>{if(full)setFull(false);else {setFull(true);void shell.current?.requestFullscreen?.().catch(()=>{});}}}>{copy(full?'close':'fullscreen',language)}</button><output>{Math.round(view.scale*100)}%</output></div><p>{copy('mapHelp',language)}</p><div ref={stage} className="map-stage" tabIndex={0} aria-label={copy('mapHelp',language)} onKeyDown={e=>{if(['+','=','-','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();if(e.key==='+'||e.key==='=')zoom(.25);else if(e.key==='-')zoom(-.25);else setView(v=>({...v,x:v.x+(e.key==='ArrowLeft'?-30:e.key==='ArrowRight'?30:0),y:v.y+(e.key==='ArrowUp'?-30:e.key==='ArrowDown'?30:0)}));}}} onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);pointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});last.current=snapshot();}} onPointerMove={move} onPointerUp={stop} onPointerCancel={stop} onLostPointerCapture={stop}><div className="map-transform" style={{transform:`translate(${view.x}px,${view.y}px) scale(${view.scale})`}}><Media src={catalog.relationship.src} alt={localized(catalog.relationship.alt,language)} /></div></div></div> : null}</>;
+  return catalog.relationship ? <div ref={shell} tabIndex={-1} className={`map-shell glass ${full ? 'map-full' : ''}`} role={full ? 'dialog' : undefined} aria-modal={full || undefined} aria-label={copy('relationships',language)}><div className="map-tools"><button className="button button-secondary" onClick={reset}>{copy('reset',language)}</button><button className="icon-button" aria-label={copy('zoomIn',language)} onClick={()=>zoom(.25)}>+</button><button className="icon-button" aria-label={copy('zoomOut',language)} onClick={()=>zoom(-.25)}>−</button><button className="button button-secondary" onClick={()=>{if(full)setFull(false);else {setFull(true);void shell.current?.requestFullscreen?.().catch(()=>{});}}}>{copy(full?'close':'fullscreen',language)}</button><output>{Math.round(view.scale*100)}%</output></div><p>{copy('mapHelp',language)}</p><div ref={stage} className="map-stage" tabIndex={0} aria-label={copy('mapHelp',language)} onKeyDown={e=>{if(['+','=','-','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();if(e.key==='+'||e.key==='=')zoom(.25);else if(e.key==='-')zoom(-.25);else setView(v=>({...v,x:v.x+(e.key==='ArrowLeft'?-30:e.key==='ArrowRight'?30:0),y:v.y+(e.key==='ArrowUp'?-30:e.key==='ArrowDown'?30:0)}));}}} onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);pointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});last.current=snapshot();}} onPointerMove={move} onPointerUp={stop} onPointerCancel={stop} onLostPointerCapture={stop}><div className="map-transform" style={{transform:`translate(${view.x}px,${view.y}px) scale(${view.scale})`}}><Media src={catalog.relationship.src} alt={localized(catalog.relationship.alt,language)} /></div></div></div> : null;
+}
+const worldSections = [
+  { href: '/world', label: 'worldbuilding', title: 'world' },
+  { href: '/world/regions', label: 'regions', title: 'regions' },
+  { href: '/world/relationships', label: 'relationships', title: 'relationships' },
+] as const;
+
+function World({ catalog, language, route }: Props & { catalog: Catalog; route: string }) {
+  const enabled = useContext(AnimationContext);
+  const [, segment, id, extra] = route.split('/');
+  const section = segment === 'relationships' ? 2 : segment === 'regions' ? 1 : 0;
+  const current = worldSections[section];
+  const validRoute = !extra && (!segment || segment === 'regions'
+    || (segment === 'relationships' && !id) || (segment === 'articles' && !!id));
+  const articles = catalog.articles.filter(article => article.kind === (section === 1 ? 'region' : 'worldbuilding'))
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const article = section !== 2 && validRoute && id ? articles.find(item => item.id === id) : undefined;
+  return <section className="world-page">
+    {!article && <PageTitle title={current.title} intro={section === 2 ? 'relationshipsIntro' : undefined} language={language} />}
+    <nav className="world-nav" aria-label={copy('worldNavigation', language)}>
+      {worldSections.map((item, index) => <a key={item.href} href={`#${item.href}`} aria-current={index === section ? (article ? 'location' : 'page') : undefined}>
+        {label(item.label, language)}
+      </a>)}
+      <span aria-hidden="true" className="world-indicator" style={{ transform: `translateX(${section * 100}%)` }} />
+    </nav>
+    <AnimatePresence mode="wait" initial={false}>
+      <m.div key={route} initial={{ opacity: 0, y: enabled ? 8 : 0 }} animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0 }} transition={{ duration: enabled ? .2 : 0 }}>
+        {!validRoute ? <Empty title={copy('notFound', language)} />
+          : section === 2 ? <Relationships {...{ catalog, language }} />
+          : article ? <Reader {...{ article, articles, language }} base={current.href} backLabel={section === 1 ? 'regions' : 'worldbuilding'} />
+          : id ? <Empty title={copy('notFound', language)} />
+          : articles.length > 0 && <div className={section === 1 ? 'region-index' : 'worldbuilding-index'}>
+            {articles.map(item => <a className="world-entry" href={`#${current.href}${section === 0 ? '/articles' : ''}/${item.id}`} key={item.id}>
+              {item.cover && <div className="world-entry-image"><Media src={item.cover} alt="" retryable={false} /></div>}
+              <div className="world-entry-copy">
+                <h2>{localized(item.title, language)}</h2>
+                {localized(item.summary, language) && <p>{localized(item.summary, language)}</p>}
+              </div>
+            </a>)}
+          </div>}
+      </m.div>
+    </AnimatePresence>
+  </section>;
 }
 function Typewriter({ brief, full }: { brief: string; full: string }) {
   const enabled = useContext(AnimationContext);
@@ -97,11 +153,11 @@ export default function ContentPages({ route, language, theme }: Props & { route
   const [catalog,setCatalog]=useState<Catalog|null>(null);
   const [error,setError]=useState(false);
   const [attempt,setAttempt]=useState(0);
-  const needsCatalog=['archive','relationships','shop'].includes(route.split('/')[0]);
+  const needsCatalog=['archive','world','shop'].includes(route.split('/')[0]);
   useEffect(()=>{if(!needsCatalog)return;const controller=new AbortController();setError(false);fetch(asset('content/catalog.json'),{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('Unavailable');return r.json();}).then(readCatalog).then(setCatalog).catch(()=>{if(!controller.signal.aborted)setError(true);});return()=>controller.abort();},[attempt,needsCatalog]);
   if(route==='about')return <CharacterPage language={language} theme={theme} />;
-  if(!['archive','relationships','shop'].includes(route.split('/')[0]))return <div className="content-page page-width"><Empty title={copy('notFound',language)}/><a href="#/">{copy('home',language)}</a></div>;
+  if(!['archive','world','shop'].includes(route.split('/')[0]))return <div className="content-page page-width"><Empty title={copy('notFound',language)}/><a href="#/">{copy('home',language)}</a></div>;
   if(error)return <div className="content-page page-width"><Empty title={copy('loadError',language)}/><button className="button button-secondary" onClick={()=>setAttempt(x=>x+1)}>{copy('retry',language)}</button></div>;
   if(!catalog)return <p className="content-loading page-width" role="status">{copy('loading',language)}</p>;
-  return <div className="content-page page-width">{route.startsWith('archive')?<Archive catalog={catalog} language={language} id={route.split('/')[1]}/>:route==='relationships'?<Relationships catalog={catalog} language={language}/>:<Shop catalog={catalog} language={language}/>}</div>;
+  return <div className="content-page page-width">{route.startsWith('archive')?<Archive catalog={catalog} language={language} id={route.split('/')[1]}/>:route.split('/')[0]==='world'?<World catalog={catalog} route={route} language={language}/>:<Shop catalog={catalog} language={language}/>}</div>;
 }
