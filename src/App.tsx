@@ -11,7 +11,7 @@ import { Background } from './components/Background';
 import { GlassFilters } from './components/Glass';
 import { Icon } from './components/Icon';
 import { AnimationContext } from './components/AnimatedText';
-import { useRoute } from './router';
+import { routePath, useRoute } from './router';
 import { copy } from './content';
 import { Opening, SceneMotion } from './components/SceneMotion';
 import { usePageMetadata } from './hooks/usePageMetadata';
@@ -25,12 +25,13 @@ export default function App() {
   const { t } = useTranslation();
   const preferences = usePreferences();
   const route = useRoute();
+  const path = routePath(route);
   usePageMetadata(route, preferences.language);
   return <AnimationContext value={preferences.motionEnabled}><LazyMotion features={loadMotionFeatures}><MotionConfig reducedMotion={preferences.motionEnabled ? 'user' : 'always'}>
     <a className="skip-link" href="#main">{t('skip')}</a>
-    <GlassFilters /><Background enabled={preferences.motionEnabled} route={route === 'world/relationships' ? 'relationships' : route} /><Opening enabled={preferences.motionEnabled} route={route} />
+    <GlassFilters /><Background enabled={preferences.motionEnabled} route={path === 'world/relationships' ? 'relationships' : path} /><Opening enabled={preferences.motionEnabled} route={route} />
     <Header preferences={preferences} />
-    <main id="main" tabIndex={-1}><AnimatePresence mode="wait" initial={false}><m.div key={route === 'world' || route.startsWith('world/') ? 'world' : route} className="route-scene" initial={{ opacity: 0, y: preferences.motionEnabled ? 24 : 0, scale: preferences.motionEnabled ? .985 : 1 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: preferences.motionEnabled ? -16 : 0 }} transition={{ duration: preferences.motionEnabled ? .32 : 0, ease: [.22, 1, .36, 1] }}><SceneMotion enabled={preferences.motionEnabled}>{preferences.motionEnabled && <div className="route-light" aria-hidden="true" />}
+    <main id="main" tabIndex={-1}><AnimatePresence mode="wait" initial={false}><m.div key={path === 'world' || path.startsWith('world/') ? 'world' : path} className="route-scene" initial={{ opacity: 0, y: preferences.motionEnabled ? 24 : 0, scale: preferences.motionEnabled ? .985 : 1 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: preferences.motionEnabled ? -16 : 0 }} transition={{ duration: preferences.motionEnabled ? .32 : 0, ease: [.22, 1, .36, 1] }}><SceneMotion enabled={preferences.motionEnabled}>{preferences.motionEnabled && <div className="route-light" aria-hidden="true" />}
     {route ? <Suspense fallback={<p className="page-width content-loading" role="status">{copy('loading', preferences.language)}</p>}><ContentPages route={route} language={preferences.language} theme={preferences.effectiveTheme} /></Suspense> : <><Hero language={preferences.language} animated={preferences.motionEnabled} theme={preferences.effectiveTheme} />
       <div className="section-divider page-width" aria-hidden="true"><span />✳<span /></div>
       <section id="connect" className="connect-section page-width" aria-labelledby="connect-heading"><Socials /><Music language={preferences.language} /></section>

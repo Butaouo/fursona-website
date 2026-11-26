@@ -10,9 +10,8 @@ export type Catalog = { version: 1; articles: Article[]; products: Product[]; re
 export const localized = (copy: Copy, language: Language) => copy[language] || copy['zh-TW'];
 export const emptyCatalog: Catalog = { version: 1, articles: [], products: [], relationship: null };
 export const words = {
-  home: ['首頁', 'Home'], archive: ['創作', 'Works'], world: ['世界觀', 'World'], worldbuilding: ['世界觀', 'Worldbuilding'], regions: ['地區', 'Regions'], region: ['地區', 'Region'], worldNavigation: ['世界觀導覽', 'World navigation'], relationships: ['關係網', 'Relationships'], shop: ['商品', 'Products'], about: ['設定', 'Character'],
+  home: ['首頁', 'Home'], archive: ['文章', 'Articles'], world: ['世界觀', 'World'], worldbuilding: ['世界觀', 'Worldbuilding'], regions: ['地區', 'Regions'], region: ['地區', 'Region'], worldNavigation: ['世界觀導覽', 'World navigation'], relationships: ['關係網', 'Relationships'], shop: ['商品', 'Products'], about: ['設定', 'Character'],
   characterDescription: ['久天的角色設定、穿衣與毛色參考、角色插畫，以及物種與性格資料。', 'LongDay’s character references, outfit, fur markings, illustrations, species and personality.'],
-  archiveIntro: ['故事在字裡行間，也在每一幅畫之中。', 'Stories live between the lines — and inside every frame.'],
   shopIntro: ['把喜歡的片刻，留在日常裡。', 'A little of this world, brought into everyday life.'],
   novel: ['小說', 'Novels'], diary: ['日記', 'Diary'],
   preview: ['查看商品', 'View details'],

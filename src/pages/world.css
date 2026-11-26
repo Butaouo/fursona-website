@@ -72,5 +72,5 @@
 
 /* Keep all three localized titles on one line at narrow mobile widths. */
 @media (max-width: 480px) {
-  .world-page .content-heading h1 { font-size: clamp(1.75rem, 9vw, 2.75rem); }
+  :is(.world-page, .archive-page) .content-heading h1 { font-size: clamp(1.75rem, 9vw, 2.75rem); }
 }
