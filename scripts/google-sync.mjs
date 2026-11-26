@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import sharp from 'sharp';
-import { readCatalog } from '../src/content.ts';
+import { articleKinds, readCatalog } from '../src/content.ts';
 
 const MAX_BYTES = 20 * 1024 * 1024;
 const scopes = ['documents.readonly','drive.readonly','spreadsheets.readonly'].map(s=>`https://www.googleapis.com/auth/${s}`).join(' ');
@@ -62,7 +62,7 @@ export function selectTab(document, tabId) {
   return tab.documentTab;
 }
 /** Keep paragraph elements and inline illustrations in exact source order; unsupported shapes fail closed. */
-export async function parseDocument(document, tabId, downloadImage) {
+export async function parseDocument(document, tabId, downloadImage, articleKind) {
   const tab = selectTab(document, tabId);
   const blocks = [];
   for (const entry of tab.body?.content || []) {
@@ -71,8 +71,12 @@ export async function parseDocument(document, tabId, downloadImage) {
     const paragraph = entry.paragraph;
     if (paragraph.positionedObjectIds?.length) fail('Floating images must be changed to inline before publication');
     const style = paragraph.paragraphStyle?.namedStyleType || 'NORMAL_TEXT';
+    const docsLevel = Number(/^HEADING_([1-6])$/.exec(style)?.[1]);
+    const level = articleKind === 'worldbuilding' || articleKind === 'region'
+      ? Math.min(6, docsLevel + 1 || 2)
+      : style === 'HEADING_3' ? 3 : 2;
     let runs = [];
-    const flush = (preserveBlank = false) => { const text = runs.map(r=>r.text).join(''); const heading = !!text.trim() && /HEADING_|TITLE/.test(style); if (text.trim() || (preserveBlank && text.length)) blocks.push(text.trim() === '---' ? {type:'divider'} : {type:heading?'heading':'paragraph', ...(heading?{level:style==='HEADING_3'?3:2}:{}),runs}); runs=[]; };
+    const flush = (preserveBlank = false) => { const text = runs.map(r=>r.text).join(''); const heading = !!text.trim() && /HEADING_|TITLE/.test(style); if (text.trim() || (preserveBlank && text.length)) blocks.push(text.trim() === '---' ? {type:'divider'} : {type:heading?'heading':'paragraph', ...(heading?{level}:{}),runs}); runs=[]; };
     for (const element of paragraph.elements || []) {
       if (element.textRun) { const r=element.textRun; runs.push({text:r.content || '',...(r.textStyle?.bold?{bold:true}:{}),...(r.textStyle?.italic?{italic:true}:{})}); }
       else if (element.inlineObjectElement) { flush(); const object=tab.inlineObjects?.[element.inlineObjectElement.inlineObjectId]?.inlineObjectProperties?.embeddedObject; const uri=object?.imageProperties?.contentUri; if(!uri)fail('Unsupported embedded object; use an inline image'); const image=await downloadImage(uri); blocks.push({type:'image',...image,alt:object.description||object.title||'Illustration',...(object.title?{caption:object.title}:{})}); }
@@ -177,7 +181,7 @@ export async function sync({ env=process.env, request=fetch, output=resolve('pub
       const eligible = published({ ...row, date }, today);
       if (target) report({ phase: 'target-eligibility', eligible });
       if (!eligible) continue;
-      if (!row.title || !['novel', 'diary'].includes(row.kind)) fail('Published article requires title and kind');
+      if (!row.title || !articleKinds.includes(row.kind)) fail('Published article requires title and kind');
       report({ phase: 'article-document', target, sheetRow: row.sheetRow });
       const docId = validId(row.docId);
       if (!documents.has(docId)) {
@@ -186,7 +190,7 @@ export async function sync({ env=process.env, request=fetch, output=resolve('pub
       }
       const document = documents.get(docId);
       report({ phase: 'article-parsing', target, sheetRow: row.sheetRow });
-      const blocks=await parseDocument(document,row.tabId,fromUri);
+      const blocks=await parseDocument(document,row.tabId,fromUri,row.kind);
       if (target || (diagnostic && diaryIds.has(row.id))) report({
         phase: 'target-document', id: row.id, tabs: document.tabs?.length ?? 0, blocks: blocks.length,
         blankParagraphs: blocks.filter(block => block.type === 'paragraph' && !block.runs.some(run => run.text.trim())).length,
