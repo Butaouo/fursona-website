@@ -23,7 +23,7 @@ test('world navigation supports responsive bilingual deep links and legacy histo
   await page.route('**/content/catalog.json', route => route.fulfill({ json: { version: 1, articles: [], products: [], relationship: null } }));
   await page.goto('./#/world');
   const mainNav = page.getByRole('navigation', { name: '主選單' });
-  for (const [index, name] of ['首頁', '創作', '世界觀', '商品', '設定'].entries()) {
+  for (const [index, name] of ['首頁', '文章', '世界觀', '商品', '設定'].entries()) {
     await expect(mainNav.getByRole('link').nth(index)).toHaveAccessibleName(name);
   }
   const tabs = page.getByRole('navigation', { name: '世界觀導覽' });
@@ -44,7 +44,7 @@ test('world navigation supports responsive bilingual deep links and legacy histo
   await expect(page.locator('footer')).toContainText('落日熔金 盼願永恆');
   await page.getByRole('button', { name: 'Switch to English' }).click();
   const englishMain = page.getByRole('navigation', { name: 'Main navigation' });
-  for (const [index, name] of ['Home', 'Works', 'World', 'Products', 'Character'].entries()) {
+  for (const [index, name] of ['Home', 'Articles', 'World', 'Products', 'Character'].entries()) {
     await expect(englishMain.getByRole('link').nth(index)).toHaveAccessibleName(name);
   }
   const englishTabs = page.getByRole('navigation', { name: 'World navigation' });
@@ -126,18 +126,55 @@ test('shared secondary navigation keeps titles and menus aligned as selections c
     }
   }
   const worldLineStyle = await indicator.evaluate(line => getComputedStyle(line).transition);
-  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Works' }).click();
-  await expect(menu.getByRole('button')).toHaveCount(2);
-  await expect(menu.getByRole('button').first()).toHaveAccessibleName('Diary');
-  await expect(menu.getByRole('button').last()).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Articles' }).click();
+  await expect(menu.getByRole('link')).toHaveCount(2);
+  await expect(menu.getByRole('link').first()).toHaveAccessibleName('Novels');
+  await expect(menu.getByRole('link').first()).toHaveAttribute('aria-current', 'page');
+  await expect(menu.getByRole('link').last()).toHaveAccessibleName('Diary');
+  await expect(heading.locator('.eyebrow')).toHaveText('LONGDAY / ARTICLES');
+  await expect(heading.locator(':scope > p')).toHaveCount(1);
+  await expect(page).toHaveTitle('Articles · LongDay');
   expect(await indicator.evaluate(line => getComputedStyle(line).transition)).toBe(worldLineStyle);
   await finishPageEntrance();
   const original = await geometry();
   const track = (await menu.boundingBox())!;
   const marker = (await indicator.boundingBox())!;
   expect(Math.abs(marker.width - track.width / 2)).toBeLessThanOrEqual(1);
-  await menu.getByRole('button', { name: 'Diary' }).click();
-  await expect(menu.getByRole('button', { name: 'Diary' })).toHaveAttribute('aria-pressed', 'true');
+  await menu.getByRole('link', { name: 'Diary' }).click();
+  await expect(menu.getByRole('link', { name: 'Diary' })).toHaveAttribute('aria-current', 'page');
+  await expect(page).toHaveURL(/#\/archive\?kind=diary$/);
   await stable(original);
-  await expect.poll(async () => Math.abs((await indicator.boundingBox())!.x - track.x)).toBeLessThanOrEqual(1);
+  await expect.poll(async () => Math.abs((await indicator.boundingBox())!.x - (track.x + track.width / 2))).toBeLessThanOrEqual(1);
+});
+
+test('Articles keeps the chosen category across reload and browser history without changing reader URLs', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.route('**/content/catalog.json', route => route.fulfill({
+    json: {
+      version: 1,
+      articles: [{ ...worldArticle, id: 'diary-01', kind: 'diary', title: { 'zh-TW': '日記測試' } }],
+      products: [],
+      relationship: null,
+    },
+  }));
+  await page.goto('./#/archive');
+  const categories = page.getByRole('navigation', { name: '文章', exact: true });
+  const novels = categories.getByRole('link', { name: '小說' });
+  const diary = categories.getByRole('link', { name: '日記' });
+  await expect(novels).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('.archive-card')).toHaveCount(0);
+  await diary.click();
+  await expect(diary).toHaveAttribute('aria-current', 'page');
+  const entry = page.getByRole('link', { name: /日記測試/ });
+  await expect(entry).toHaveAttribute('href', '#/archive/diary-01');
+  await page.reload();
+  await expect(diary).toHaveAttribute('aria-current', 'page');
+  await expect(entry).toBeVisible();
+  await page.goBack();
+  await expect(novels).toHaveAttribute('aria-current', 'page');
+  await page.goForward();
+  await expect(diary).toHaveAttribute('aria-current', 'page');
+  await entry.click();
+  await expect(page).toHaveURL(/#\/archive\/diary-01$/);
+  await expect(page.getByRole('heading', { level: 1, name: '日記測試' })).toBeVisible();
 });
